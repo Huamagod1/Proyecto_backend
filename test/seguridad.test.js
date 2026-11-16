@@ -87,6 +87,15 @@ test('6 logins fallidos seguidos: el sexto responde 429', async () => {
   assert.deepEqual(estados, [401, 401, 401, 401, 401, 429]);
 });
 
+test('detrás de nginx (trust proxy = 1) el límite de logins se cuenta por la IP real del cliente', async () => {
+  const appProxy = crearApp({ confiarProxy: 1 });
+  const intentar = (ip) =>
+    request(appProxy).post('/api/auth/login').set('X-Forwarded-For', ip).send({ usuario: 'admin', clave: 'mala' });
+  for (let i = 0; i < 5; i++) await intentar('203.0.113.10');           // agota los 5 intentos de una IP
+  assert.equal((await intentar('203.0.113.10')).status, 429);            // esa IP queda bloqueada
+  assert.equal((await intentar('198.51.100.20')).status, 401);           // otra IP sigue pudiendo intentar
+});
+
 test('un lector intenta crear un motor: 403, y queda en la auditoría', async () => {
   const token = await login('lector-sur');
   const res = await request(app)

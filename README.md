@@ -91,4 +91,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 12 · Docker: todo con un comando.
+Fase 13 · Linux: despliegue como servicio (archivos en [deploy/](deploy/); pasos en [docs/apuntes/fase-13.md](docs/apuntes/fase-13.md)).

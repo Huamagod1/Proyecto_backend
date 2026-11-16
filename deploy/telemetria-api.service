@@ -1,0 +1,76 @@
+# telemetria-api.service · la API como servicio de systemd (Fase 13).
+# Se copia a /etc/systemd/system/ y se activa con:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now telemetria-api
+# Logs: journalctl -u telemetria-api -f
+# OJO: en los archivos de systemd los comentarios van en su propia línea. Un "#" al final de una
+# directiva NO es un comentario: pasa a ser parte del valor.
+
+[Unit]
+Description=Telemetria de motores - API (Express, MQTT y WebSocket)
+Documentation=https://github.com/Huamagod1/Proyecto_backend
+# Arranca después de que la red esté lista y de Docker, donde viven MySQL y Mosquitto.
+# Si docker.service no existe (Docker Desktop en WSL), After= simplemente no espera nada.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+# simple: el proceso que lanza ExecStart ES el servicio (node no se va a segundo plano).
+Type=simple
+# SEGURIDAD: un usuario de sistema sin shell ni carpeta personal; nunca root.
+User=telemetria
+Group=telemetria
+# El enlace "actual" apunta a la versión desplegada; cambiarlo es la vuelta atrás (desplegar.sh).
+WorkingDirectory=/opt/telemetria/actual
+# Variables de entorno (DB_CLAVE, JWT_SECRETO, CONFIAR_PROXY=1...). Archivo de root con permisos 600.
+EnvironmentFile=/etc/telemetria/api.env
+# Node del sistema (NodeSource): el de nvm vive en una carpeta personal que systemd no ve.
+ExecStart=/usr/bin/node src/api/server.js
+# Rearme automático: si el proceso muere por lo que sea, systemd lo vuelve a lanzar a los 5 s.
+Restart=always
+RestartSec=5
+# Al detener: SIGTERM (el apagado ordenado de server.js) y, si a los 10 s sigue vivo, SIGKILL.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+# Nombre en el journal.
+SyslogIdentifier=telemetria-api
+
+# ── Endurecimiento ──
+# El proceso (y sus hijos) no puede ganar privilegios, por ejemplo con un binario setuid.
+NoNewPrivileges=true
+# Todo el sistema de archivos queda de solo lectura para el servicio (/usr, /etc, /opt...).
+ProtectSystem=strict
+# /home, /root y /run/user quedan invisibles.
+ProtectHome=true
+# Un /tmp propio y vacío, que no comparte con otros servicios.
+PrivateTmp=true
+
+# ── Más endurecimiento: mídelo con `systemd-analyze security telemetria-api` (0 = blindado, 10 = expuesto) ──
+# Sin acceso a dispositivos de /dev (salvo null, zero y random).
+PrivateDevices=true
+# /proc/sys y /sys de solo lectura, sin cargar módulos ni leer el log del kernel.
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+# Sin tocar los cgroups, el reloj ni el nombre del equipo.
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+# Sin crear namespaces, sin prioridad de tiempo real y sin archivos setuid.
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Solo llamadas al sistema de la arquitectura nativa (x86-64).
+SystemCallArchitectures=native
+# Solo red IP (MySQL, MQTT, HTTP) y sockets locales.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# Vacío: el proceso no conserva ninguna capacidad de root.
+CapabilityBoundingSet=
+# Los archivos que cree solo los lee su dueño.
+UMask=0077
+# OJO: MemoryDenyWriteExecute=true NO va: el JIT de V8 (Node) necesita memoria escribible y
+# ejecutable a la vez, y el servicio moriría al arrancar.
+
+[Install]
+# Se inicia con el arranque normal del sistema (modo multiusuario).
+WantedBy=multi-user.target

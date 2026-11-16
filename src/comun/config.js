@@ -26,6 +26,8 @@ const esquema = z.object({
   MQTT_URL: z.string().regex(/^mqtts?:\/\//, 'debe empezar con mqtt:// o mqtts://').default('mqtt://127.0.0.1:1883'),
   MQTT_USUARIO: z.string().min(1).optional(),
   MQTT_CLAVE: z.string().min(1).optional(),
+  // Fase 13: cuántos proxies hay delante (1 = nginx). 0 = la API recibe las conexiones directo.
+  CONFIAR_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 });
 
 const resultado = esquema.safeParse(process.env);
@@ -51,4 +53,5 @@ export const config = Object.freeze({
     duracionSeg: 15 * 60, // 15 min en s: si roban un token, sirve poco tiempo
   }),
   mqtt: Object.freeze({ url: env.MQTT_URL, usuario: env.MQTT_USUARIO, clave: env.MQTT_CLAVE }),
+  confiarProxy: env.CONFIAR_PROXY,
 });

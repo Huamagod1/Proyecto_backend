@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import { pool } from './db.js';
+import { config } from '../comun/config.js';
 import { ErrorHttp } from '../comun/errores.js';
 import { registrarAcceso } from './auditoria.js';
 import { rutasAuth } from './rutas/auth.js';
@@ -17,10 +18,18 @@ import { rutasLecturas } from './rutas/lecturas.js';
 
 /**
  * Crea una instancia nueva de la aplicación.
+ * @param {{confiarProxy?: number}} [opciones] proxies de confianza delante; por defecto, CONFIAR_PROXY
  * @returns {import('express').Express} la app lista para listen() o para supertest
  */
-export function crearApp() {
+export function crearApp({ confiarProxy = config.confiarProxy } = {}) {
   const app = express();
+
+  // Fase 13. CONCEPTO: detrás de nginx, cada petición llega desde 127.0.0.1 (nginx), y la IP real
+  // del cliente viene en el encabezado X-Forwarded-For. 'trust proxy' = N le dice a Express que
+  // confíe en los N últimos saltos de ese encabezado para calcular req.ip.
+  // SEGURIDAD: sin esto, el límite de logins contaría a todos los clientes como uno solo (la IP de
+  // nginx). Con un valor mayor que el real, un atacante podría inventar su IP en el encabezado.
+  if (confiarProxy > 0) app.set('trust proxy', confiarProxy);
 
   // CONCEPTO: middleware. Una función (req, res, next) por la que pasa cada petición, en el orden
   // en que se registra: como los filtros de Spring Security en FlowSense. El orden importa.

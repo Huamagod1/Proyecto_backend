@@ -1,0 +1,56 @@
+# telemetria-gateway.service · el gateway Modbus → MQTT como servicio de systemd (Fase 13).
+# Se copia a /etc/systemd/system/ y se activa con:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now telemetria-gateway
+# Logs: journalctl -u telemetria-gateway -f
+# OJO: comentarios solo en su propia línea (ver telemetria-api.service).
+
+[Unit]
+Description=Telemetria de motores - gateway Modbus TCP a MQTT con buffer SQLite
+Documentation=https://github.com/Huamagod1/Proyecto_backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=telemetria
+Group=telemetria
+WorkingDirectory=/opt/telemetria/actual
+# MODBUS_HOST, GATEWAY_*, MQTT_URL y GATEWAY_BUFFER=/var/lib/telemetria/buffer.sqlite
+EnvironmentFile=/etc/telemetria/gateway.env
+ExecStart=/usr/bin/node src/gateway/gateway.js
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=10
+SyslogIdentifier=telemetria-gateway
+
+# ── Endurecimiento (ver telemetria-api.service) ──
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# La única carpeta donde puede escribir: la del buffer SQLite. Con ProtectSystem=strict, sin esta
+# línea el gateway no podría guardar nada y perdería el store-and-forward.
+ReadWritePaths=/var/lib/telemetria
+# Más endurecimiento (explicado en telemetria-api.service).
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+# Red IP para Modbus TCP y MQTT, y sockets locales.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+UMask=0077
+# OJO: con Modbus RTU por un puerto serie real (/dev/ttyUSB0), PrivateDevices=true lo ocultaría:
+# habría que quitarlo y permitir solo ese dispositivo con DeviceAllow=/dev/ttyUSB0 rw.
+
+[Install]
+WantedBy=multi-user.target
