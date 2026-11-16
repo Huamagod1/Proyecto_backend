@@ -28,6 +28,14 @@ bash src/scripts/claves-mqtt.sh   # usuarios del broker (api, gw-norte) desde .e
 
 Tópicos y formato de los mensajes MQTT: [docs/topicos.md](docs/topicos.md).
 
+Terreno simulado, cada uno en su terminal (la de VS Code, para que el simulador reciba teclas):
+
+```bash
+npm run api          # ingesta HTTP y MQTT
+npm run simulador    # Modbus TCP en el puerto 5020: MTR-01 y MTR-02
+npm run gateway      # lee Modbus, guarda en SQLite y publica por MQTT
+```
+
 API y pruebas:
 
 ```bash
@@ -52,4 +60,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 6 · MQTT: broker, tópicos y loteador.
+Fase 7 · Terreno: simulador Modbus y gateway con buffer.

@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "description": "Plataforma de telemetría de motores: Modbus, CAN, MQTT, API Node.js, MySQL y tiempo real",
   "scripts": {
-    "test": "node --env-file=.env.test --test \"test/*.test.js\"",
+    "test": "node --env-file=.env.test --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
     "api": "node --env-file=.env src/api/server.js",
     "api:dev": "node --env-file=.env --watch src/api/server.js",
     "sembrar": "node --env-file=.env src/scripts/sembrar-usuarios.js",
-    "lote-ejemplo": "node src/scripts/generar-lote-ejemplo.js"
+    "lote-ejemplo": "node src/scripts/generar-lote-ejemplo.js",
+    "simulador": "node --env-file=.env src/simulador/motor-modbus.js",
+    "gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js"
   },
   "repository": {
     "type": "git",
@@ -29,6 +31,7 @@
     "express-rate-limit": "^8.7.4",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
+    "modbus-serial": "^8.0.25",
     "mqtt": "^5.16.1",
     "mysql2": "^3.24.6",
     "zod": "^4.6.7"
