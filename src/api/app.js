@@ -12,6 +12,7 @@ import { registrarAcceso } from './auditoria.js';
 import { rutasAuth } from './rutas/auth.js';
 import { rutasMotores } from './rutas/motores.js';
 import { rutasAuditoria } from './rutas/auditoria.js';
+import { rutasLecturas } from './rutas/lecturas.js';
 
 /**
  * Crea una instancia nueva de la aplicación.
@@ -50,6 +51,10 @@ export function crearApp() {
   app.use('/api/auth', rutasAuth());
   app.use('/api/motores', rutasMotores());
   app.use('/api/auditoria', rutasAuditoria());
+  // Lecturas (Fase 5): POST /api/lecturas y las series y el estado bajo /api/motores/:codigo/...
+  // OJO: va después del router de motores; /api/motores/MTR-01/lecturas no calza con su
+  // '/:codigo' (un solo segmento) y la petición sigue hasta aquí.
+  app.use('/api', rutasLecturas());
 
   // Ninguna ruta respondió: 404 en JSON, igual que el resto de la API (Express respondería en HTML).
   app.use((req, res) => {

@@ -8,6 +8,7 @@ import { Router } from 'express';
 import { z } from '../../comun/zod.js';
 import { pool } from '../db.js';
 import { autenticar, autorizar, puedeVerSitio } from '../auth.js';
+import { cargarCatalogo } from '../catalogo.js';
 import { ErrorHttp } from '../../comun/errores.js';
 import { validar } from '../../comun/validacion.js';
 
@@ -118,6 +119,8 @@ export function rutasMotores() {
     } catch (err) {
       traducirErrorMysql(err, datos.codigo);
     }
+    // Fase 5: el motor nuevo recibe lecturas de inmediato, sin esperar el refresco de 60 s.
+    await cargarCatalogo();
     res
       .status(201)
       .location(`/api/motores/${datos.codigo}`)
@@ -146,6 +149,7 @@ export function rutasMotores() {
     // afectadas (con flags: '-FOUND_ROWS', Fase 5). Releer el motor responde las dos preguntas.
     const motor = await buscarMotor(req.params.codigo, req.usuario);
     if (!motor) throw noExiste(req.params.codigo);
+    await cargarCatalogo(); // el cambio de sitio afecta qué gateway puede enviar sus lecturas
     res.json(motor);
   });
 
@@ -158,6 +162,7 @@ export function rutasMotores() {
     );
     // Aquí affectedRows sí sirve: la fila siempre cambia de TRUE a FALSE, o no era visible.
     if (r.affectedRows === 0) throw noExiste(req.params.codigo);
+    await cargarCatalogo(); // un motor dado de baja deja de aceptar lecturas
     res.status(204).end(); // 204 No Content: hecho, sin cuerpo
   });
 

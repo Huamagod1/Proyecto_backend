@@ -6,7 +6,8 @@
     "test": "node --env-file=.env.test --test \"test/*.test.js\"",
     "api": "node --env-file=.env src/api/server.js",
     "api:dev": "node --env-file=.env --watch src/api/server.js",
-    "sembrar": "node --env-file=.env src/scripts/sembrar-usuarios.js"
+    "sembrar": "node --env-file=.env src/scripts/sembrar-usuarios.js",
+    "lote-ejemplo": "node src/scripts/generar-lote-ejemplo.js"
   },
   "repository": {
     "type": "git",

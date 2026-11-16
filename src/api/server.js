@@ -5,7 +5,13 @@
  */
 import { crearApp } from './app.js';
 import { cerrarPool } from './db.js';
+import { cargarCatalogo, iniciarRefresco, detenerRefresco } from './catalogo.js';
 import { config } from '../comun/config.js';
+
+// Fase 5: el catálogo de motores y variables se carga al arrancar y se refresca cada 60 s.
+// Si MySQL todavía no responde, no se cae: la primera lectura que llegue lo vuelve a intentar.
+cargarCatalogo().catch((err) => console.error('catálogo: no pude cargarlo al arrancar:', err.message));
+iniciarRefresco();
 
 const app = crearApp();
 
@@ -38,6 +44,8 @@ async function apagar(senal) {
     console.error('El apagado tardó más de 8 s: salgo a la fuerza');
     process.exit(1);
   }, 8_000).unref();
+
+  detenerRefresco(); // sin más consultas periódicas al catálogo
 
   // close(): deja de aceptar conexiones nuevas y espera que terminen las peticiones en curso.
   // Desde Node 19 también cierra las conexiones keep-alive que están ociosas.

@@ -1,0 +1,70 @@
+{
+  "lecturas": [
+    {
+      "motor": "MTR-01",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 1500
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "temp_refrigerante",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 85.2
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "presion_aceite",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 420
+    },
+    {
+      "motor": "MTR-02",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 1480
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 1500
+    },
+    {
+      "motor": "MTR-02",
+      "variable": "temp_refrigerante",
+      "ts": "2026-11-16T01:47:42.383Z",
+      "valor": 158.4
+    },
+    {
+      "motor": "MTR-999",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 1500
+    },
+    {
+      "motor": "MTR-03",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 1500
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "humedad",
+      "ts": "2026-11-16T01:47:32.383Z",
+      "valor": 40
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "rpm",
+      "ts": "2026-11-16T01:58:32.383Z",
+      "valor": 1500
+    },
+    {
+      "motor": "MTR-01",
+      "variable": "rpm",
+      "ts": "2026-10-07T01:48:32.383Z",
+      "valor": 1500
+    }
+  ]
+}

@@ -20,6 +20,11 @@ export const pool = mysql.createPool({
   waitForConnections: true,  // si las 10 están ocupadas, la consulta espera en cola en vez de fallar
   // POR QUÉ: los Date de JS se escriben y se leen como UTC, igual que la base (ver docker-compose.yml).
   timezone: 'Z',
+  // Fase 5. CONCEPTO: CLIENT_FOUND_ROWS es un flag que mysql2 activa por defecto: hace que
+  // affectedRows cuente las filas ENCONTRADAS. Con '-FOUND_ROWS' (el - lo quita) cuenta las
+  // CAMBIADAS: en INSERT ... ON DUPLICATE KEY UPDATE valor = valor, una fila nueva suma 1 y una
+  // repetida suma 0. Así affectedRows dice cuántas lecturas eran nuevas (ver repositorio.js).
+  flags: ['-FOUND_ROWS'],
 });
 
 /**

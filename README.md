@@ -33,6 +33,14 @@ npm run api:dev                                     # http://localhost:3000/api/
 bash src/scripts/preparar-db-test.sh && npm test    # recrea telemetria_test y corre las pruebas
 ```
 
+Ingesta de un lote de ejemplo (con el token de `gw-norte`):
+
+```bash
+npm run lote-ejemplo     # regenera practica/lote-ejemplo.json con horas recientes
+curl -s -X POST localhost:3000/api/lecturas -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d @practica/lote-ejemplo.json
+```
+
 Consultas de práctica sobre la base:
 
 ```bash
@@ -41,4 +49,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 4 · Seguridad: login, roles, permiso por sitio y auditoría.
+Fase 5 · Ingesta HTTP: validar y no duplicar.
