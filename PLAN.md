@@ -80,7 +80,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 - [x] Fase 8 · CAN y J1939: decodificar tramas del motor (1–2 h)
 - [x] Fase 9 · Tiempo real: WebSocket y dashboard (2–3 h)
 - [x] Fase 10 · Node-RED: el gateway en bloques (1–2 h)
-- [ ] Fase 11 · SQL con volumen: millones de filas (3 h)
+- [x] Fase 11 · SQL con volumen: millones de filas (3 h)
 - [ ] Fase 12 · Docker: todo con un comando (2 h)
 - [ ] Fase 13 · Linux: despliegue como servicio (3 h)
 - [ ] Fase 14 · Operación e integración con SCADA/EMS (2 h)

@@ -17,7 +17,11 @@ services:
       DB_CLAVE: ${DB_CLAVE}                           # la lee sql/003_usuario_app.sh para crear telemetria_app
       TZ: UTC                                         # POR QUÉ: horas del contenedor sin saltos por cambio de horario
       LANG: C.UTF-8                                   # OJO: sin esto, el cliente mysql del contenedor usa latin1 y "°C" se ve "�C"
-    command: ["--default-time-zone=+00:00"]           # las sesiones de MySQL también en UTC: NOW() devuelve UTC
+    command:
+      - --default-time-zone=+00:00                    # las sesiones de MySQL también en UTC: NOW() devuelve UTC
+      - --slow-query-log=ON                           # Fase 11: anota las consultas lentas en /var/lib/mysql/<host>-slow.log
+      - --long-query-time=1                           # "lenta" = más de 1 s
+
     ports:
       - "3306:3306"                                   # host:contenedor; si choca con otro MySQL, usa "3307:3306"
     volumes:

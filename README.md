@@ -64,6 +64,14 @@ curl -s -X POST localhost:3000/api/lecturas -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d @practica/lote-ejemplo.json
 ```
 
+Volumen y rendimiento (Fase 11; resultados en [docs/rendimiento.md](docs/rendimiento.md)):
+
+```bash
+npm run volumen      # 2,4 millones de lecturas sintéticas en ~20 s
+# En una base creada antes de la Fase 11, aplica una vez el índice y los agregados como root:
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" telemetria' < sql/004_rendimiento.sql
+```
+
 Consultas de práctica sobre la base:
 
 ```bash
@@ -72,4 +80,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 10 · Node-RED: el gateway en bloques.
+Fase 11 · SQL con volumen: millones de filas.

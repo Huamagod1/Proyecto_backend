@@ -129,10 +129,19 @@ test('ing-norte no puede dar de baja un motor de sur: 404', async () => {
 test('GET /api/auditoria: 403 para un lector; 200 con filas para el admin', async () => {
   const lector = await request(app).get('/api/auditoria').set(conToken(tokenDe('lector', SUR)));
   assert.equal(lector.status, 403);
-  const admin = await request(app).get('/api/auditoria?pagina=1').set(conToken(tokenDe('admin')));
+  const admin = await request(app).get('/api/auditoria').set(conToken(tokenDe('admin')));
   assert.equal(admin.status, 200);
   assert.equal(admin.body.porPagina, 50);
   assert.ok(Array.isArray(admin.body.filas));
+});
+
+test('GET /api/auditoria pagina por clave: ?antesDe trae filas más antiguas que el cursor', async () => {
+  const admin = conToken(tokenDe('admin'));
+  const primera = await request(app).get('/api/auditoria').set(admin);
+  const tope = primera.body.filas[0].id; // la fila más nueva de la primera página
+  const siguiente = await request(app).get(`/api/auditoria?antesDe=${tope}`).set(admin);
+  assert.equal(siguiente.status, 200);
+  assert.ok(siguiente.body.filas.every((f) => f.id < tope), 'todas las filas son anteriores al cursor');
 });
 
 test('helmet agrega encabezados de seguridad', async () => {
