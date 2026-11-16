@@ -1,12 +1,20 @@
-# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: MySQL; Fase 6: Mosquitto;
-# Fase 10: simulador y Node-RED, en el perfil "nodered": docker compose --profile nodered up -d).
-# Compose lee las ${VARIABLES} de tu .env (misma carpeta), así las claves no quedan escritas aquí.
-# Cada fase agrega lo suyo: Mosquitto (6), simulador y Node-RED (10), API y gateway (12).
-# Uso: docker compose up -d --wait · docker compose ps · docker compose logs -f mysql
+# docker-compose.yml · todo el sistema en contenedores (fases 2, 6, 10 y 12).
+# Base, sin perfil: MySQL y Mosquitto → docker compose up -d --wait
+# Perfil "completo" (Fase 12): + API, gateway y simulador → docker compose --profile completo up -d --build
+# Perfil "nodered" (Fase 10): + simulador y Node-RED → docker compose --profile nodered up -d
+# Compose lee las ${VARIABLES} de tu .env (misma carpeta): las claves no quedan escritas aquí.
+# Dentro de Docker, cada servicio se llama por su nombre (mysql, mosquitto, simulador), no por 127.0.0.1.
 
 # POR QUÉ: nombre fijo del proyecto para contenedores y volúmenes (telemetria-mysql-1,
 # telemetria_datos-mysql). Sin esta línea, Compose usaría el nombre de la carpeta.
 name: telemetria
+
+# x-app: bloque reutilizable ("extension field"); <<: *app lo copia en cada servicio que lo nombra.
+# POR QUÉ: la API, el gateway y el simulador comparten una sola imagen y solo cambian el comando.
+x-app: &app
+  build: .                                            # construye con el Dockerfile de esta carpeta
+  image: telemetria-app:latest                        # nombre de la imagen construida (la reutilizan los tres)
+  restart: unless-stopped                             # vuelve solo si se cae o al reiniciar Docker
 
 services:
   mysql:
@@ -21,7 +29,6 @@ services:
       - --default-time-zone=+00:00                    # las sesiones de MySQL también en UTC: NOW() devuelve UTC
       - --slow-query-log=ON                           # Fase 11: anota las consultas lentas en /var/lib/mysql/<host>-slow.log
       - --long-query-time=1                           # "lenta" = más de 1 s
-
     ports:
       - "3306:3306"                                   # host:contenedor; si choca con otro MySQL, usa "3307:3306"
     volumes:
@@ -48,23 +55,72 @@ services:
       - datos-mosquitto:/mosquitto/data               # persistencia: sesiones y mensajes QoS 1 pendientes
     restart: unless-stopped
 
-  # Fase 10: el simulador dentro de Compose, para que Node-RED lo alcance por su nombre (simulador:5020).
-  # Temporal: la Fase 12 lo reemplaza por la imagen del proyecto.
+  # Simulador Modbus TCP (fases 10 y 12): la misma imagen del proyecto con otro comando.
   simulador:
-    image: node:26-trixie-slim                        # Node 26 LTS sobre Debian 13, versión slim (sin herramientas de compilación)
-    profiles: ["nodered"]                             # POR QUÉ: solo se levanta con --profile nodered; así no choca con `npm run simulador`
-    working_dir: /app
-    # npm ci --omit=dev: instala las dependencias de producción desde package-lock.json, en Linux.
-    command: sh -c "npm ci --omit=dev --no-audit --no-fund && node src/simulador/motor-modbus.js"
+    <<: *app
+    profiles: ["completo", "nodered"]                 # lo usan el gateway en contenedor y Node-RED
+    command: ["node", "src/simulador/motor-modbus.js"]
     environment:
       SIMULADOR_HOST: 0.0.0.0                         # escucha en la red del contenedor, no solo en su localhost
     ports:
-      - "127.0.0.1:5020:5020"                         # SEGURIDAD: solo desde tu equipo; el gateway en código lo usa en 127.0.0.1
+      - "127.0.0.1:5020:5020"                         # SEGURIDAD: solo desde tu equipo (para el gateway de `npm run gateway`)
+
+  api:
+    <<: *app
+    profiles: ["completo"]
+    # SEGURIDAD: solo las variables que la API usa, y no todo el .env (por ejemplo, sin la clave de root).
+    environment:
+      PUERTO: 3000
+      DB_HOST: mysql                                  # el nombre del servicio, resuelto por la red de Compose
+      DB_PUERTO: 3306
+      DB_USUARIO: ${DB_USUARIO}
+      DB_CLAVE: ${DB_CLAVE}
+      DB_NOMBRE: ${DB_NOMBRE}
+      JWT_SECRETO: ${JWT_SECRETO}
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_USUARIO: ${MQTT_USUARIO}
+      MQTT_CLAVE: ${MQTT_CLAVE}
+    ports:
+      - "3000:3000"                                   # API y dashboard en http://localhost:3000
+    depends_on:
+      mysql:
+        condition: service_healthy                    # no arranca hasta que MySQL termine de inicializarse
+      mosquitto:
+        # OJO: la imagen de Mosquitto 2.1 no trae healthcheck; basta con que haya arrancado,
+        # porque los clientes MQTT se reconectan solos cada 2 s.
+        condition: service_started
+    healthcheck:
+      # La imagen slim no trae curl: se usa el fetch de Node. Código de salida 0 = sana.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/salud').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  gateway:
+    <<: *app
+    profiles: ["completo"]
+    command: ["node", "src/gateway/gateway.js"]
+    environment:
+      MODBUS_HOST: simulador
+      MODBUS_PUERTO: 5020
+      GATEWAY_ID: ${GATEWAY_ID}
+      GATEWAY_SITIO: ${GATEWAY_SITIO}
+      GATEWAY_EQUIPOS: ${GATEWAY_EQUIPOS}             # con Node-RED activo, 1:MTR-01 (Node-RED lee MTR-02)
+      GATEWAY_BUFFER: /app/datos/buffer.sqlite        # dentro del volumen: el buffer sobrevive a recrear el contenedor
+      GATEWAY_PERIODO_MS: ${GATEWAY_PERIODO_MS}
+      MQTT_URL: mqtt://mosquitto:1883
+      GATEWAY_MQTT_USUARIO: ${GATEWAY_MQTT_USUARIO}
+      GATEWAY_MQTT_CLAVE: ${GATEWAY_MQTT_CLAVE}
     volumes:
-      - .:/app                                        # el código del proyecto, tal como está en tu disco
-      # OJO: volumen anónimo encima de node_modules: el contenedor usa el suyo (Linux) y no el de Windows.
-      - /app/node_modules
-    restart: unless-stopped
+      - datos-gateway:/app/datos                      # POR QUÉ: store-and-forward en disco, no en la capa del contenedor
+    depends_on:
+      simulador:
+        condition: service_started
+      mosquitto:
+        # OJO: la imagen de Mosquitto 2.1 no trae healthcheck; basta con que haya arrancado,
+        # porque los clientes MQTT se reconectan solos cada 2 s.
+        condition: service_started
 
   nodered:
     image: nodered/node-red:5.0                       # Node-RED 5.0 con Node 24; node-red-contrib-modbus exige Node 22 o superior
@@ -89,3 +145,4 @@ volumes:
   datos-mysql:                                        # Compose lo crea como telemetria_datos-mysql
   datos-mosquitto:                                    # sobrevive a reinicios y a docker compose down (sin -v)
   datos-nodered:                                      # el /data de Node-RED (Fase 10)
+  datos-gateway:                                      # el buffer SQLite del gateway en contenedor (Fase 12)

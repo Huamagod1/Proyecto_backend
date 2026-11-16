@@ -1,0 +1,24 @@
+# .dockerignore · lo que NO entra al contexto de build de la imagen (Fase 12).
+# POR QUÉ: un contexto chico se envía rápido al motor de Docker, y nada sensible o inútil termina
+# dentro de la imagen por un COPY descuidado.
+
+# Las dependencias se instalan dentro de la imagen (Linux); las de Windows no sirven y pesan.
+node_modules
+# El historial de Git no se ejecuta.
+.git
+# SEGURIDAD: los secretos entran por variables de entorno al levantar el contenedor, nunca en la imagen.
+.env*
+# Bases SQLite locales y datos generados.
+*.sqlite
+*.sqlite-*
+datos
+# Documentación, pruebas y prácticas: no corren en producción.
+docs
+test
+practica
+# Configuración de otros servicios y del editor.
+mosquitto
+flows
+sql
+deploy
+.vscode

@@ -19,6 +19,17 @@ Los apuntes de estudio de cada fase están en [docs/apuntes/](docs/apuntes/).
 
 ## Cómo levantarlo
 
+Todo en contenedores, con un comando (Fase 12):
+
+```bash
+cp .env.example .env                                # y pon tus claves
+docker compose --profile completo up -d --build     # MySQL, Mosquitto, API, gateway y simulador
+bash src/scripts/claves-mqtt.sh                     # usuarios del broker (la primera vez)
+npm install && npm run sembrar                      # usuarios de la API (la primera vez; el contenedor no recibe las CLAVE_*)
+```
+
+Dashboard en http://localhost:3000. Para desarrollar, cada pieza también corre en tu equipo:
+
 ```bash
 cp .env.example .env              # y pon tus claves
 npm install
@@ -80,4 +91,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 11 · SQL con volumen: millones de filas.
+Fase 12 · Docker: todo con un comando.
