@@ -1,94 +1,90 @@
 # Proyecto_backend · Plataforma de telemetría de motores
 
 Proyecto de práctica para el cargo de Back-end Developer de datos industriales. Lleva la
-telemetría de motores desde el terreno hasta un dashboard:
+telemetría de motores desde el terreno hasta un dashboard y otros sistemas:
 
 ```
-Simulador Modbus ─┐
-Log CAN J1939 ────┼─ MQTT (Mosquitto) ─> API Node.js + Express ─> MySQL ─> WebSocket ─> Dashboard
-Node-RED ─────────┘                       JWT, roles, auditoría             API de integración ─> SCADA / EMS
+Simulador Modbus TCP ── gateway (buffer SQLite) ─┐
+Log CAN J1939 ───────── decodificador ───────────┼─ MQTT QoS 1 (Mosquitto 2.1, usuarios y ACL)
+Node-RED (Modbus en bloques) ────────────────────┘                │
+                                                                   ▼
+            API Node.js + Express 5: ingesta MQTT y HTTP, zod, JWT, roles, permiso por sitio, auditoría
+                       │                        │                          │
+             MySQL 8.4 (PK compuesta,     WebSocket ──> dashboard    API de integración (X-API-Key)
+             agregados, particiones)                                  y MQTT de solo lectura ──> SCADA / EMS
 ```
 
-El plan completo, fase por fase, está en [PLAN.md](PLAN.md), y el avance en [PROGRESO.md](PROGRESO.md).
-Los apuntes de estudio de cada fase están en [docs/apuntes/](docs/apuntes/).
+- **Plan** fase por fase: [PLAN.md](PLAN.md) · **avance:** [PROGRESO.md](PROGRESO.md) · **apuntes de estudio:** [docs/apuntes/](docs/apuntes/)
+- **Decisiones de diseño:** [docs/decisiones.md](docs/decisiones.md) · **rendimiento medido:** [docs/rendimiento.md](docs/rendimiento.md) · **runbook:** [docs/RUNBOOK.md](docs/RUNBOOK.md)
+- **Tópicos MQTT:** [docs/topicos.md](docs/topicos.md) · **J1939:** [docs/j1939.md](docs/j1939.md) · **RS485:** [docs/rs485.md](docs/rs485.md)
 
 ## Requisitos
 
-- Windows 11 con Git Bash (o Linux), Node 22.13 o superior (recomendado: Node 26 LTS).
+- Windows 11 con Git Bash (o Linux) y Node 22.13 o superior (recomendado: Node 26 LTS).
 - Docker Desktop con Docker Compose v2.
 
-## Cómo levantarlo
-
-Todo en contenedores, con un comando (Fase 12):
+## Levantarlo todo en contenedores
 
 ```bash
-cp .env.example .env                                # y pon tus claves
+cp .env.example .env                                # pon tus claves (openssl rand -hex 16)
 docker compose --profile completo up -d --build     # MySQL, Mosquitto, API, gateway y simulador
-bash src/scripts/claves-mqtt.sh                     # usuarios del broker (la primera vez)
-npm install && npm run sembrar                      # usuarios de la API (la primera vez; el contenedor no recibe las CLAVE_*)
+bash src/scripts/claves-mqtt.sh                     # usuarios del broker desde .env (la primera vez)
+npm install && npm run sembrar                      # usuarios de la API (la primera vez)
 ```
 
-Dashboard en http://localhost:3000. Para desarrollar, cada pieza también corre en tu equipo:
+Dashboard en http://localhost:3000: inicia sesión, por ejemplo, con `ing-norte` y la clave
+`CLAVE_ING_NORTE` de tu `.env`. Cada usuario ve solo los motores de su sitio.
+
+## Desarrollar pieza por pieza
 
 ```bash
-cp .env.example .env              # y pon tus claves
-npm install
-docker compose up -d --wait       # MySQL 8.4 y Mosquitto 2.1; la primera vez crea la base con sql/
-bash src/scripts/claves-mqtt.sh   # usuarios del broker (api, gw-norte) desde .env
+docker compose up -d --wait       # solo MySQL y Mosquitto
+npm run api:dev                   # API con reinicio al guardar
+npm run simulador                 # Modbus TCP en el puerto 5020 (en la terminal de VS Code: teclas t, f, d)
+npm run gateway                   # Modbus → SQLite → MQTT
+npm run can                       # practica/candump-ejemplo.log (J1939) → MQTT, como MTR-03
 ```
 
-Tópicos y formato de los mensajes MQTT: [docs/topicos.md](docs/topicos.md).
-
-Terreno simulado, cada uno en su terminal (la de VS Code, para que el simulador reciba teclas):
+Node-RED (lee MTR-02; con esto activo, deja `GATEWAY_EQUIPOS=1:MTR-01` en tu `.env`):
 
 ```bash
-npm run api          # ingesta HTTP y MQTT
-npm run simulador    # Modbus TCP en el puerto 5020: MTR-01 y MTR-02
-npm run gateway      # lee Modbus, guarda en SQLite y publica por MQTT
-npm run can          # decodifica practica/candump-ejemplo.log (J1939) y publica MTR-03
-```
-
-Node-RED (MTR-02 en bloques; con esto activo, deja `GATEWAY_EQUIPOS=1:MTR-01` en tu `.env`):
-
-```bash
-docker compose --profile nodered up -d                                      # simulador en contenedor + Node-RED
+docker compose --profile nodered up -d
 docker compose exec -w /data nodered npm install node-red-contrib-modbus    # solo la primera vez
 docker compose restart nodered && npm run nodered:desplegar                 # editor en http://127.0.0.1:1880
 ```
 
-Dashboard en vivo: abre http://localhost:3000 e inicia sesión (por ejemplo, `ing-norte` con la clave
-`CLAVE_ING_NORTE` de tu `.env`). Cada usuario ve solo los motores de su sitio.
-
-API y pruebas:
+## Pruebas
 
 ```bash
-npm run sembrar                                     # usuarios admin, ing-norte, lector-sur, gw-norte
-npm run api:dev                                     # http://localhost:3000/api/salud
-bash src/scripts/preparar-db-test.sh && npm test    # recrea telemetria_test y corre las pruebas
+bash src/scripts/preparar-db-test.sh && npm test    # recrea telemetria_test y corre las 68 pruebas
 ```
 
-Ingesta de un lote de ejemplo (con el token de `gw-norte`):
+## Operación e integración
 
 ```bash
-npm run lote-ejemplo     # regenera practica/lote-ejemplo.json con horas recientes
-curl -s -X POST localhost:3000/api/lecturas -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' -d @practica/lote-ejemplo.json
+curl -s localhost:3000/api/salud                    # el proceso está vivo
+curl -s localhost:3000/api/listo                    # base y MQTT conectados (503 si no)
+npm run clave-api -- scada-norte norte              # clave para un SCADA del sitio norte (se muestra una vez)
+curl -s -H "X-API-Key: $CLAVE" "localhost:3000/api/integracion/estado?sitio=norte"
+docker compose logs api --no-log-prefix | jq 'select(.nivel != "info")'   # logs JSON
 ```
 
-Volumen y rendimiento (Fase 11; resultados en [docs/rendimiento.md](docs/rendimiento.md)):
+## Datos de práctica
 
 ```bash
-npm run volumen      # 2,4 millones de lecturas sintéticas en ~20 s
-# En una base creada antes de la Fase 11, aplica una vez el índice y los agregados como root:
+npm run lote-ejemplo                                # lote HTTP con horas recientes (practica/lote-ejemplo.json)
+npm run volumen                                     # 2,4 millones de lecturas sintéticas en ~20 s
+docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" telemetria' < practica/consultas.sql
+# Una base creada antes de las fases 11 y 14 necesita, una vez y como root, sql/004 y sql/005:
 docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" telemetria' < sql/004_rendimiento.sql
 ```
 
-Consultas de práctica sobre la base:
+## Despliegue en Linux
 
-```bash
-docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" telemetria' < practica/consultas.sql
-```
+Unidades de systemd, nginx, respaldos y despliegue con vuelta atrás en [deploy/](deploy/); los pasos
+están en [docs/apuntes/fase-13.md](docs/apuntes/fase-13.md).
 
-## En qué fase va
+## Estado
 
-Fase 13 · Linux: despliegue como servicio (archivos en [deploy/](deploy/); pasos en [docs/apuntes/fase-13.md](docs/apuntes/fase-13.md)).
+v1.0.0 · fases 0 a 14 construidas. La Fase 13 tiene los archivos listos y verificados en contenedores;
+falta ejecutar el despliegue en un Ubuntu 24.04 (WSL 2 o EC2).

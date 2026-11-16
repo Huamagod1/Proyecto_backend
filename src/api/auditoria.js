@@ -4,6 +4,7 @@
  * qué recurso, con qué resultado, desde qué IP y cuánto tardó. La tabla solo admite INSERT.
  */
 import { pool } from './db.js';
+import { log } from '../comun/log.js';
 
 // Rutas que no se auditan. POR QUÉ: los monitores consultan la salud cada pocos segundos; anotar
 // esas llamadas llenaría la tabla de ruido sin valor de trazabilidad.
@@ -42,7 +43,7 @@ export function registrarAcceso(req, res, next) {
       )
       // POR QUÉ: si la auditoría falla, se anota en el log, pero nunca rompe la respuesta
       // (que además ya se envió). Sin este catch, la promesa rechazada tumbaría el proceso.
-      .catch((err) => console.error('auditoría: no pude registrar el acceso:', err.message));
+      .catch((err) => log.error('auditoria_fallida', { error: err }));
   });
 
   next();

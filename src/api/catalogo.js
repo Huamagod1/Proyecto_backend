@@ -6,6 +6,7 @@
  * instante y se actualiza cada cierto tiempo, en vez de llamar a la oficina por cada dato.
  */
 import { pool } from './db.js';
+import { log } from '../comun/log.js';
 
 // El catálogo vigente. Se reemplaza entero en cada carga: quien lo lee nunca ve un Map a medio llenar.
 let actual = {
@@ -72,7 +73,7 @@ export function iniciarRefresco(ms = 60_000) {
   detenerRefresco();
   temporizador = setInterval(() => {
     // Si MySQL falla, se conserva el catálogo anterior y se reintenta en el próximo ciclo.
-    cargarCatalogo().catch((err) => console.error('catálogo: no pude refrescar:', err.message));
+    cargarCatalogo().catch((err) => log.error('catalogo_refresco_fallido', { error: err }));
   }, ms);
   temporizador.unref(); // unref(): el temporizador no impide que el proceso termine
 }

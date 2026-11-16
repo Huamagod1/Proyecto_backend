@@ -4,9 +4,11 @@
 # OJO: si un cliente publica donde no puede, en MQTT 3.1.1 el broker descarta el mensaje en
 # silencio (no hay error); en MQTT 5 responde "Not authorized".
 
-# La API lee la telemetría y el estado de todos los sitios; no puede publicar nada.
+# La API lee la telemetría y el estado de todos los sitios. Desde la Fase 14 publica solo una
+# cosa: el resumen retenido de motores sin datos de cada sitio.
 user api
 topic read motores/#
+topic write motores/+/alertas
 
 # El gateway del sitio norte solo escribe en su sitio: telemetría, su estado y su Last Will.
 # SEGURIDAD: aunque roben su clave, no puede inyectar datos de otra faena.
@@ -20,3 +22,8 @@ topic write motores/sur/#
 # Node-RED (Fase 10): solo la telemetría de MTR-02, el único equipo que lee su flujo.
 user nodered
 topic write motores/norte/MTR-02/telemetria
+
+# Fase 14 (ejemplo, desactivado): un EMS del sitio norte, solo lectura de su sitio. Para activarlo,
+# quita los # de las dos líneas y agrega el usuario ems con su clave en claves-mqtt.sh.
+# user ems
+# topic read motores/norte/#

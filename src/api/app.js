@@ -7,21 +7,27 @@
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
-import { pool } from './db.js';
 import { config } from '../comun/config.js';
+import { log } from '../comun/log.js';
 import { ErrorHttp } from '../comun/errores.js';
 import { registrarAcceso } from './auditoria.js';
 import { rutasAuth } from './rutas/auth.js';
 import { rutasMotores } from './rutas/motores.js';
 import { rutasAuditoria } from './rutas/auditoria.js';
 import { rutasLecturas } from './rutas/lecturas.js';
+import { rutasOperacion } from './rutas/operacion.js';
+import { rutasIntegracion } from './rutas/integracion.js';
 
 /**
  * Crea una instancia nueva de la aplicación.
- * @param {{confiarProxy?: number}} [opciones] proxies de confianza delante; por defecto, CONFIAR_PROXY
+ * @param {object} [opciones]
+ * @param {number} [opciones.confiarProxy] proxies de confianza delante; por defecto, CONFIAR_PROXY
+ * @param {() => boolean|null} [opciones.mqttConectado] estado del broker para /api/listo (null = sin MQTT)
+ * @param {() => object} [opciones.metricas] números del proceso para /api/metricas
  * @returns {import('express').Express} la app lista para listen() o para supertest
+ * POR QUÉ las dependencias entran como opciones: las pruebas crean la app sin broker ni loteador.
  */
-export function crearApp({ confiarProxy = config.confiarProxy } = {}) {
+export function crearApp({ confiarProxy = config.confiarProxy, mqttConectado = () => null, metricas = () => ({}) } = {}) {
   const app = express();
 
   // Fase 13. CONCEPTO: detrás de nginx, cada petición llega desde 127.0.0.1 (nginx), y la IP real
@@ -54,19 +60,13 @@ export function crearApp({ confiarProxy = config.confiarProxy } = {}) {
   // Convierte el cuerpo JSON en req.body. limit: un cuerpo de más de 1 MB responde 413.
   app.use(express.json({ limit: '1mb' }));
 
-  // Salud: el proceso está vivo y la base responde. Lo consultan los monitores y el balanceador.
-  app.get('/api/salud', async (req, res) => {
-    try {
-      await pool.query('SELECT 1'); // la consulta más barata posible: solo prueba la conexión
-      res.json({ estado: 'ok', db: 'ok' });
-    } catch (err) {
-      console.error('salud: la base no responde:', err.message);
-      // 503 Service Unavailable: "ahora no puedo atender", a diferencia de un 500 (error del código).
-      res.status(503).json({ estado: 'error', db: 'error' });
-    }
-  });
+  // Fase 14: /api/salud (vivo), /api/listo (base y MQTT) y /api/metricas (admin).
+  // En la Fase 3, /api/salud también probaba la base; ahora eso es trabajo de /api/listo.
+  app.use('/api', rutasOperacion({ mqttConectado, metricas }));
 
   app.use('/api/auth', rutasAuth());
+  // Fase 14: integración con SCADA y EMS, con clave de API en vez de JWT.
+  app.use('/api/integracion', rutasIntegracion());
   app.use('/api/motores', rutasMotores());
   app.use('/api/auditoria', rutasAuditoria());
   // Lecturas (Fase 5): POST /api/lecturas y las series y el estado bajo /api/motores/:codigo/...
@@ -100,7 +100,7 @@ export function crearApp({ confiarProxy = config.confiarProxy } = {}) {
     }
     // Inesperado: todo el detalle al log, nada al cliente.
     // SEGURIDAD: un stack trace o un mensaje de SQL le dicen a un atacante cómo está hecha la API.
-    console.error(`${req.method} ${req.originalUrl}:`, err);
+    log.error('error_no_controlado', { metodo: req.method, ruta: req.originalUrl, error: err });
     res.status(500).json({ error: 'Error interno' });
   });
 

@@ -12,7 +12,8 @@
     "gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js",
     "can": "node --env-file=.env src/scripts/can-a-mqtt.js practica/candump-ejemplo.log",
     "nodered:desplegar": "node --env-file=.env src/scripts/desplegar-nodered.js",
-    "volumen": "node --env-file=.env src/scripts/generar-volumen.js"
+    "volumen": "node --env-file=.env src/scripts/generar-volumen.js",
+    "clave-api": "node --env-file=.env src/scripts/crear-clave-api.js"
   },
   "repository": {
     "type": "git",

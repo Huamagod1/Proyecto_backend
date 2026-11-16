@@ -178,10 +178,10 @@ function conectarSocket() {
   });
 }
 
-/** Fase 14: alerta de silencio de un sitio. */
+/** Fase 14: alerta de silencio (nivel 'aviso', en rojo) o recuperación de un motor (nivel 'info', en verde). */
 function pintarAlerta(alerta) {
   const aviso = document.createElement('p');
-  aviso.className = 'alerta';
+  aviso.className = alerta.nivel === 'info' ? 'alerta recuperado' : 'alerta';
   aviso.textContent = `${new Date(alerta.ts).toLocaleTimeString()} · ${alerta.texto}`;
   $('#alertas').prepend(aviso);
 }

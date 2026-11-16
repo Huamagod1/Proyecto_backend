@@ -11,6 +11,7 @@ import mqtt from 'mqtt';
 import { z } from '../comun/zod.js';
 import { decodificarRegistros, alarmasActivas } from '../comun/decodificacion.js';
 import { abrirBuffer } from './buffer-local.js';
+import { log } from '../comun/log.js';
 
 // Configuración propia del gateway: no depende de la de la API (no necesita MySQL ni JWT).
 const cfg = z
@@ -51,12 +52,12 @@ const cliente = mqtt.connect(cfg.MQTT_URL, {
 });
 
 cliente.on('connect', async () => {
-  console.log(`MQTT: conectado a ${cfg.MQTT_URL}; ${buffer.pendientes()} mensajes en el buffer`);
+  log.info('mqtt_conectado', { url: cfg.MQTT_URL, enBuffer: buffer.pendientes() });
   await cliente.publishAsync(topicoEstado, 'online', { qos: 1, retain: true }).catch(() => {});
   void drenar(); // al volver el enlace, lo acumulado sale en orden
 });
-cliente.on('error', (err) => console.error('MQTT:', err.message));
-cliente.on('offline', () => console.error(`MQTT: sin enlace; guardando en el buffer (${buffer.pendientes()} pendientes)`));
+cliente.on('error', (err) => log.error('mqtt_error', { error: err }));
+cliente.on('offline', () => log.aviso('mqtt_sin_enlace', { enBuffer: buffer.pendientes() }));
 
 let drenando = false;
 
@@ -79,7 +80,7 @@ async function drenar() {
       }
     }
   } catch (err) {
-    console.error('drenaje interrumpido:', err.message);
+    log.aviso('drenaje_interrumpido', { enBuffer: buffer.pendientes(), error: err });
   } finally {
     drenando = false;
   }
@@ -101,23 +102,23 @@ async function ciclo() {
         // Función 03 (Read Holding Registers): 8 registros desde la dirección 0.
         const { data } = await modbus.readHoldingRegisters(0, 8);
         const { lecturas, sinDato } = decodificarRegistros(data);
-        if (sinDato.length > 0) console.warn(`${motor}: sin dato en ${sinDato.join(', ')}`);
+        if (sinDato.length > 0) log.aviso('registros_sin_dato', { motor, variables: sinDato });
         if (ultimasAlarmas.get(motor) !== lecturas.alarmas) {
           ultimasAlarmas.set(motor, lecturas.alarmas);
-          console.log(`${motor}: alarmas → ${alarmasActivas(lecturas.alarmas ?? 0).join(', ') || 'ninguna'}`);
+          log.info('alarmas_cambiaron', { motor, activas: alarmasActivas(lecturas.alarmas ?? 0) });
         }
         // La hora la pone el gateway al leer: si el mensaje espera horas en el buffer, conserva su hora real.
         const mensaje = { motor, gateway: cfg.GATEWAY_ID, ts: new Date().toISOString(), lecturas };
         // POR QUÉ guardar antes de publicar: si el enlace o el proceso caen después de este punto,
         // el dato ya está en disco. Publicar primero arriesgaría perder justo lo del corte.
         const { descartados } = buffer.guardar(`motores/${cfg.GATEWAY_SITIO}/${motor}/telemetria`, JSON.stringify(mensaje));
-        if (descartados > 0) console.error(`buffer lleno: se descartaron ${descartados} mensajes antiguos`);
+        if (descartados > 0) log.error('buffer_lleno', { descartados });
       } catch (err) {
-        console.error(`${motor} (Unit ${unitId}): no respondió: ${err.message}`);
+        log.aviso('equipo_sin_respuesta', { motor, unitId, error: err });
       }
     }
   } catch (err) {
-    console.error(`Modbus: sin conexión con ${cfg.MODBUS_HOST}:${cfg.MODBUS_PUERTO}: ${err.message}`);
+    log.error('modbus_sin_conexion', { host: cfg.MODBUS_HOST, puerto: cfg.MODBUS_PUERTO, error: err });
     modbus.close(() => {}); // se reintenta conectar en el próximo ciclo
   }
   // POR QUÉ sin await: tras un corte largo, drenar miles de mensajes toma su tiempo. Si el ciclo lo
@@ -134,7 +135,7 @@ async function ciclo() {
 
 let deteniendo = false;
 let temporizador = setTimeout(ciclo, 0);
-console.log(`Gateway ${cfg.GATEWAY_ID} (sitio ${cfg.GATEWAY_SITIO}, PID ${process.pid}): ${equipos.map((e) => `${e.unitId}=${e.motor}`).join(', ')} cada ${cfg.GATEWAY_PERIODO_MS} ms`);
+log.info('gateway_iniciado', { id: cfg.GATEWAY_ID, sitio: cfg.GATEWAY_SITIO, pid: process.pid, equipos: cfg.GATEWAY_EQUIPOS, periodoMs: cfg.GATEWAY_PERIODO_MS });
 
 /**
  * Apagado ordenado: deja de leer, avisa 'offline' y cierra todo.
@@ -143,7 +144,7 @@ console.log(`Gateway ${cfg.GATEWAY_ID} (sitio ${cfg.GATEWAY_SITIO}, PID ${proces
 async function apagar(senal) {
   if (deteniendo) return;
   deteniendo = true;
-  console.log(`${senal}: apagando el gateway (${buffer.pendientes()} mensajes quedan en el buffer)`);
+  log.info('gateway_apagando', { senal, enBuffer: buffer.pendientes() });
   clearTimeout(temporizador);
   if (cliente.connected) await cliente.publishAsync(topicoEstado, 'offline', { qos: 1, retain: true }).catch(() => {});
   await cliente.endAsync().catch(() => {});

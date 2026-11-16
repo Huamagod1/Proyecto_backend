@@ -11,6 +11,7 @@ import mqtt from 'mqtt';
 import { z } from '../comun/zod.js';
 import { catalogoListo } from './catalogo.js';
 import { evaluarLectura } from '../comun/validacion.js';
+import { log } from '../comun/log.js';
 
 // Forma del mensaje de telemetría (ver docs/topicos.md).
 const esquemaMensaje = z.object({
@@ -56,21 +57,21 @@ export function iniciarIngestaMqtt({ url, usuario, clave, loteador, alCambiarGat
 
   cliente.on('connect', (connack) => {
     // sessionPresent: el broker ya tenía guardada la sesión (y quizás mensajes pendientes).
-    console.log(`MQTT: conectado a ${url} (sesión ${connack.sessionPresent ? 'recuperada' : 'nueva'})`);
+    log.info('mqtt_conectado', { url, sesion: connack.sessionPresent ? 'recuperada' : 'nueva' });
     // + reemplaza un nivel del tópico. QoS 1: "al menos una vez" (ver docs/topicos.md).
     cliente.subscribe(
       { 'motores/+/+/telemetria': { qos: 1 }, 'motores/+/gateways/+/estado': { qos: 1 } },
-      (err) => err && console.error('MQTT: no pude suscribirme:', err.message),
+      (err) => err && log.error('mqtt_suscripcion_fallida', { error: err }),
     );
   });
-  cliente.on('error', (err) => console.error('MQTT:', err.message)); // p. ej. "Not authorized"
-  cliente.on('offline', () => console.error('MQTT: sin conexión con el broker; reintento cada 2 s'));
+  cliente.on('error', (err) => log.error('mqtt_error', { error: err })); // p. ej. "Not authorized"
+  cliente.on('offline', () => log.aviso('mqtt_sin_conexion', { reintentoMs: 2000 }));
 
   // OJO: mqtt.js confirma (PUBACK) cada mensaje QoS 1 apenas lo entrega a este evento, antes de
   // que llegue a MySQL. Si la API muere de golpe, se pierde lo que el loteador tenía en memoria
   // (hasta 1 s). ALTERNATIVA: confirmar después de escribir (handleMessage); más seguro y más complejo.
   cliente.on('message', (topico, payload) => {
-    procesar(topico, payload).catch((err) => console.error(`MQTT: error con ${topico}:`, err.message));
+    procesar(topico, payload).catch((err) => log.error('mqtt_mensaje_fallido', { topico, error: err }));
   });
 
   /**
@@ -132,5 +133,14 @@ export function iniciarIngestaMqtt({ url, usuario, clave, loteador, alCambiarGat
     await cliente.endAsync();
   }
 
-  return { contadores, gateways, detener, conectado: () => cliente.connected };
+  /**
+   * Publica un mensaje con este mismo cliente (Fase 14: alertas de silencio).
+   * @param {string} topico
+   * @param {string} payload
+   * @param {{qos?: 0|1|2, retain?: boolean}} [opciones]
+   * @returns {Promise<void>} se resuelve con el PUBACK; si no hay conexión, mqtt.js la encola
+   */
+  const publicar = (topico, payload, opciones = { qos: 1 }) => cliente.publishAsync(topico, payload, opciones);
+
+  return { contadores, gateways, detener, publicar, conectado: () => cliente.connected };
 }

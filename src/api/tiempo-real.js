@@ -8,6 +8,7 @@
  */
 import { WebSocketServer, WebSocket } from 'ws';
 import { verificarToken, puedeVerSitio } from './auth.js';
+import { log } from '../comun/log.js';
 
 const LATIDO_MS = 30_000; // 30 s entre pings: detecta conexiones muertas (Wi-Fi caído, laptop cerrada)
 
@@ -58,7 +59,7 @@ export function iniciarTiempoReal(servidorHttp, { estadoInicial = () => [] } = {
       ws.vivo = true; // respondió al último ping: sigue ahí
     });
     ws.on('close', () => clearTimeout(ws.vencimiento));
-    ws.on('error', (err) => console.error('websocket:', err.message));
+    ws.on('error', (err) => log.aviso('websocket_error', { usuario: ws.usuario.usuario, error: err }));
     // Saludo y foto inicial (estados de los gateways), filtrados por sitio.
     enviar(ws, { tipo: 'bienvenida', usuario: ws.usuario.usuario, rol: ws.usuario.rol });
     for (const mensaje of estadoInicial()) {

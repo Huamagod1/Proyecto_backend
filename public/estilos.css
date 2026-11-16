@@ -82,3 +82,4 @@ button { cursor: pointer; background: var(--texto); color: var(--tarjeta); borde
 .motor.sin-datos { border-color: var(--rojo); box-shadow: 0 0 0 2px var(--rojo) inset; }
 
 .alerta { background: var(--rojo); color: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; margin: 0 0 0.5rem; }
+.alerta.recuperado { background: var(--verde); } /* un motor que volvió a enviar datos */

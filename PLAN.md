@@ -83,7 +83,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 - [x] Fase 11 · SQL con volumen: millones de filas (3 h)
 - [x] Fase 12 · Docker: todo con un comando (2 h)
 - [ ] Fase 13 · Linux: despliegue como servicio (3 h) · archivos listos y verificados en contenedores; falta ejecutarlo en Ubuntu
-- [ ] Fase 14 · Operación e integración con SCADA/EMS (2 h)
+- [x] Fase 14 · Operación e integración con SCADA/EMS (2 h)
 
 El plan completo toma unas 35 horas. **Ruta corta** (unas 22 horas): fases 0 a 7, más la 13. Es lo que más se pregunta en una entrevista técnica para este cargo.
 

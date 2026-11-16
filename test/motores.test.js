@@ -21,10 +21,10 @@ const codigo = `MTR-${Math.floor(1000 + Math.random() * 9000)}`;
 // OJO: sin cerrar el pool, sus conexiones abiertas mantienen vivo el proceso y la prueba no termina.
 after(() => cerrarPool());
 
-test('GET /api/salud responde ok con la base arriba (sin token)', async () => {
+test('GET /api/salud responde ok sin token (Fase 14: solo dice que el proceso está vivo)', async () => {
   const res = await request(app).get('/api/salud');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body, { estado: 'ok', db: 'ok' });
+  assert.equal(res.body.estado, 'ok');
 });
 
 test('GET /api/motores lista los activos con el código del sitio', async () => {

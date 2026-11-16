@@ -1,6 +1,39 @@
 # Decisiones de diseño
 
-Cada decisión con su motivo y lo que se descartó. Las fases 10 y 14 agregan las suyas.
+Cada decisión con su motivo y lo que se descartó. Las seis primeras son las que más pesan y las que
+conviene saber contar en una entrevista.
+
+## 1. PK compuesta `(motor_id, variable_id, ts)` en `lecturas`
+- **Por qué:** en InnoDB la PK es el orden físico. Las consultas siempre preguntan "este motor, esta variable, este rango de tiempo", y ese rango queda contiguo en disco (la serie de 24 h lee 8.839 filas en 3,5 ms entre 2,4 millones).
+- **Además:** la misma PK es la idempotencia: una lectura repetida choca y `ON DUPLICATE KEY UPDATE` la ignora.
+- **Descartado:** un `id` autoincremental como PK, que obligaría a un índice secundario más y dejaría pasar duplicados.
+
+## 2. QoS 1 más idempotencia en la base
+- **Por qué:** QoS 1 garantiza "al menos una vez" con dos viajes; los duplicados (reenvíos del broker o del buffer) los absorbe la PK.
+- **Descartado:** QoS 2 ("exactamente una vez") cuesta cuatro viajes y solo protege hasta el broker; QoS 0 pierde mensajes.
+- **Límite conocido:** mqtt.js confirma al recibir; si la API muere de golpe se pierde lo que el loteador tenía en memoria (hasta 1 s). La mejora: confirmar después de escribir (`handleMessage`).
+
+## 3. Store-and-forward en el gateway
+- **Por qué:** cada mensaje se guarda en SQLite **antes** de publicarse y se borra solo con el PUBACK. Un corte del enlace no pierde nada: probado con cortes de 30 y 61 s, sin huecos, y con mensajes que llegaron 10,5 horas después con su hora original.
+- **Límite:** protege del corte del enlace, no de un gateway apagado (si nadie lee los equipos, no hay datos que guardar).
+
+## 4. JWT de vida corta (15 minutos)
+- **Por qué:** un JWT no se puede revocar sin guardar estado; si lo roban, sirve poco tiempo. HS256 con `algorithms` explícito (rechaza `alg: none`) y el WebSocket se cierra cuando el token vence.
+- **Siguiente paso:** un refresh token revocable para sesiones largas.
+
+## 5. Agregados por hora (`lecturas_hora`)
+- **Por qué:** un dashboard de 7 días no necesita 60.000 puntos por motor. El promedio por hora del sitio bajó de 268 ms a 1,2 ms. Un `EVENT` recalcula cada hora las dos últimas (por los datos atrasados de un buffer).
+- **Ojo:** se combina ponderando por `n`; el promedio de promedios engaña.
+
+## 6. Particiones por mes
+- **Por qué:** borrar un mes viejo soltando su partición no depende del número de filas (28,4 s de `DELETE` contra 3,9 s de `DROP PARTITION` en Docker Desktop), y una consulta de un mes solo abre su partición.
+- **Precio:** `lecturas` no puede tener FK (por eso la validación vive en la API con el catálogo) y hay que crear la partición de cada mes (`REORGANIZE PARTITION p_futuro`).
+
+## Cómo se conectaría un EMS por MQTT (Fase 14)
+- Con su **propia credencial** en el broker (usuario `ems`, clave en `mosquitto/passwd` vía `claves-mqtt.sh`) y una **ACL de solo lectura** sobre su sitio: `user ems` + `topic read motores/norte/#` (ejemplo comentado en `mosquitto/acl`).
+- Recibe en vivo la telemetría, el estado retenido de los gateways y el resumen retenido de motores sin datos (`motores/norte/alertas`): al suscribirse, el broker le entrega de inmediato el último estado.
+- **Por qué MQTT y no solo REST:** el EMS no tiene que preguntar cada pocos segundos; y como no puede publicar, aunque roben su clave no puede inyectar datos.
+- Para SCADA que solo hablan HTTP: `GET /api/integracion/estado?sitio=norte` con `X-API-Key` (clave por sistema, guardada como SHA-256, revocable y auditada).
 
 ## El token del WebSocket viaja en la URL (Fase 9)
 

@@ -1,9 +1,9 @@
 /**
  * server.js · punto de entrada de la API: abre el puerto y hace el apagado ordenado (Fase 3).
  * Arranca con `npm run api` (o `npm run api:dev`, que reinicia al guardar cambios).
- * Fase 5: carga el catálogo. Fase 6: inicia la ingesta MQTT y el loteador que escribe en MySQL.
- * Fase 9: WebSocket en /ws; el loteador avisa cada escritura confirmada y la ingesta cada cambio
- * de estado de un gateway, y tiempo-real.js lo empuja a los dashboards.
+ * Fase 5: catálogo. Fase 6: ingesta MQTT y loteador. Fase 9: WebSocket.
+ * Fase 14: logs estructurados, /api/listo y /api/metricas, y el detector de silencio, que avisa
+ * por WebSocket y publica un resumen retenido por sitio en motores/{sitio}/alertas.
  */
 import { crearApp } from './app.js';
 import { cerrarPool } from './db.js';
@@ -12,32 +12,47 @@ import { crearLoteador } from './loteador.js';
 import { iniciarIngestaMqtt } from './ingesta-mqtt.js';
 import { guardarLote } from './repositorio.js';
 import { iniciarTiempoReal, lecturasAMensajes } from './tiempo-real.js';
+import { iniciarDetectorSilencio } from './silencio.js';
 import { config } from '../comun/config.js';
+import { log } from '../comun/log.js';
 
 // Fase 5: el catálogo de motores y variables se carga al arrancar y se refresca cada 60 s.
 // Si MySQL todavía no responde, no se cae: la primera lectura que llegue lo vuelve a intentar.
-cargarCatalogo().catch((err) => console.error('catálogo: no pude cargarlo al arrancar:', err.message));
+cargarCatalogo().catch((err) => log.error('catalogo_carga_fallida', { error: err }));
 iniciarRefresco();
 
-const app = crearApp();
+// Las funciones de abajo leen `ingesta`, `loteador`, `tiempoReal` y `detector`, que se crean más
+// adelante. Funciona porque solo se llaman cuando llega una petición, y para entonces ya existen.
+const app = crearApp({
+  mqttConectado: () => ingesta.conectado(),
+  metricas: () => ({
+    mqtt: ingesta.contadores,                 // mensajes, lecturas aceptadas y rechazos por motivo
+    loteador: loteador.estadisticas(),        // pendientes, escritas, lotes, fallos, descartadas
+    websocketClientes: tiempoReal.clientes(),
+    motoresSinDatos: detector.silenciosos(),
+  }),
+});
 
 // En Express 5, si el puerto está ocupado, el callback recibe el error (EADDRINUSE).
 const servidor = app.listen(config.puerto, (err) => {
   if (err) {
-    console.error(`No pude abrir el puerto ${config.puerto}:`, err.message);
+    log.error('api_puerto_ocupado', { puerto: config.puerto, error: err });
     process.exit(1);
   }
-  // process.pid: sirve para detener este proceso desde otra terminal (taskkill /PID en Windows).
-  console.log(`API escuchando en http://localhost:${config.puerto} (PID ${process.pid})`);
+  // pid: sirve para detener este proceso desde otra terminal (taskkill /PID en Windows).
+  log.info('api_iniciada', { url: `http://localhost:${config.puerto}`, pid: process.pid });
 });
 
 /** Mensaje de estado de un gateway para el dashboard, con el id de su sitio para filtrar. */
 const mensajeGateway = (id, info) => ({ tipo: 'gateway', id, ...info, sitio_id: catalogo.sitio(info.sitio)?.id });
 
-// Fase 9: el WebSocket comparte el puerto HTTP. Al conectarse, cada dashboard recibe el estado
-// actual de los gateways que puede ver (ingesta se define más abajo; se lee al conectar).
+// Fase 9: el WebSocket comparte el puerto HTTP. Al conectarse, cada dashboard recibe el estado de
+// los gateways y las alertas de silencio vigentes que puede ver.
 const tiempoReal = iniciarTiempoReal(servidor, {
-  estadoInicial: () => [...ingesta.gateways].map(([id, info]) => mensajeGateway(id, info)),
+  estadoInicial: () => [
+    ...[...ingesta.gateways].map(([id, info]) => mensajeGateway(id, info)),
+    ...detector.alertasActuales(),
+  ],
 });
 
 // Fase 6: lo que llega por MQTT se junta en el loteador y se escribe con guardarLote (repositorio.js).
@@ -57,6 +72,16 @@ const ingesta = iniciarIngestaMqtt({
   alCambiarGateway: (id, info) => tiempoReal.difundir(mensajeGateway(id, info)),
 });
 
+// Fase 14: detector de silencio. Las alertas van al dashboard y el resumen de cada sitio, retenido,
+// a MQTT: un EMS que se suscribe a motores/norte/alertas sabe al instante qué motores están callados.
+const detector = iniciarDetectorSilencio({
+  alAlertar: (alerta) => tiempoReal.difundir(alerta),
+  alCambiarSitio: (sitio, resumen) =>
+    ingesta
+      .publicar(`motores/${sitio}/alertas`, JSON.stringify(resumen), { qos: 1, retain: true })
+      .catch((err) => log.error('alerta_mqtt_fallida', { sitio, error: err })),
+});
+
 let apagando = false;
 
 /**
@@ -68,19 +93,19 @@ let apagando = false;
 async function apagar(senal) {
   if (apagando) return; // POR QUÉ: un segundo Ctrl+C no debe iniciar otro cierre a medias
   apagando = true;
-  console.log(`${senal} recibido: apagado ordenado`);
+  log.info('apagado_iniciado', { senal });
 
   // Red de seguridad: si algo no cierra en 8 s, sale igual. 8 s: menos que los 10 s que Docker
-  // espera tras el SIGTERM antes de matar con SIGKILL. unref(): este timer no mantiene vivo el
-  // proceso por sí solo.
+  // y systemd esperan tras el SIGTERM antes de matar con SIGKILL.
   setTimeout(() => {
-    console.error('El apagado tardó más de 8 s: salgo a la fuerza');
+    log.error('apagado_forzado', { motivo: 'tardó más de 8 s' });
     process.exit(1);
   }, 8_000).unref();
 
   let codigo = 0;
   try {
-    detenerRefresco(); // sin más consultas periódicas al catálogo
+    detenerRefresco();  // sin más consultas periódicas al catálogo
+    detector.detener(); // ni al detector de silencio
     // 0. WebSocket: cierra los dashboards con 1001 ("me voy"); el navegador se reconectará solo.
     tiempoReal.cerrar();
     // 1. HTTP: close() deja de aceptar conexiones y espera las peticiones en curso. Desde Node 19
@@ -93,10 +118,10 @@ async function apagar(senal) {
     // 4. Pool: al final, porque los pasos anteriores lo usan.
     await cerrarPool();
   } catch (err) {
-    console.error('Error durante el apagado:', err.message);
+    log.error('apagado_con_error', { error: err });
     codigo = 1;
   }
-  console.log('Apagado completo');
+  log.info('apagado_completo', { codigo });
   process.exit(codigo);
 }
 

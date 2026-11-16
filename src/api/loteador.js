@@ -6,6 +6,7 @@
  * (maxFilas) o cada cierto tiempo (intervaloMs). Mil INSERT de una fila cuestan mucho más que uno
  * de mil filas: cada viaje a la base tiene un costo fijo de red, parseo y commit.
  */
+import { log } from '../comun/log.js';
 
 /**
  * Crea un loteador.
@@ -73,7 +74,7 @@ export function crearLoteador({ escribir, maxFilas = 500, intervaloMs = 1000, ma
             totales.fallos += 1;
             cola = lote.concat(cola);
             recortar();
-            console.error(`loteador: no pude escribir ${lote.length} filas (${err.message}); reintento en ${intervaloMs} ms`);
+            log.error('loteador_escritura_fallida', { filas: lote.length, reintentoMs: intervaloMs, error: err });
             return; // sin reintento inmediato: si la base está caída, no se la martilla
           }
         }
@@ -91,7 +92,7 @@ export function crearLoteador({ escribir, maxFilas = 500, intervaloMs = 1000, ma
   async function detener() {
     clearInterval(temporizador);
     await vaciar();
-    if (cola.length > 0) console.error(`loteador: quedaron ${cola.length} filas sin escribir al apagar`);
+    if (cola.length > 0) log.error('loteador_filas_sin_escribir', { filas: cola.length });
     return cola.length;
   }
 

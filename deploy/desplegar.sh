@@ -14,7 +14,8 @@ REPO="${REPO:-https://github.com/Huamagod1/Proyecto_backend.git}"
 BASE=/opt/telemetria
 DESTINO="$BASE/releases/$TAG"
 ACTUAL="$BASE/actual"
-SALUD="${SALUD:-http://127.0.0.1:3000/api/salud}"
+# /api/listo y no /api/salud: una versión que arranca pero no llega a MySQL o al broker no sirve (Fase 14).
+SALUD="${SALUD:-http://127.0.0.1:3000/api/listo}"
 SERVICIOS=(telemetria-api telemetria-gateway)
 
 # La versión vigente, para poder volver a ella. readlink -f: a qué carpeta apunta el enlace hoy.
