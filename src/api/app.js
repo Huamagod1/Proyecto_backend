@@ -1,0 +1,69 @@
+/**
+ * app.js · arma la aplicación Express: la cadena de middlewares y rutas (Fase 3).
+ * crearApp() no abre ningún puerto: server.js la pone a escuchar y las pruebas la usan con
+ * supertest, sin red. Las fases siguientes agregan seguridad (4), lecturas (5) y tiempo real (9).
+ */
+import express from 'express';
+import { pool } from './db.js';
+import { ErrorHttp } from '../comun/errores.js';
+import { rutasMotores } from './rutas/motores.js';
+
+/**
+ * Crea una instancia nueva de la aplicación.
+ * @returns {import('express').Express} la app lista para listen() o para supertest
+ */
+export function crearApp() {
+  const app = express();
+
+  // CONCEPTO: middleware. Una función (req, res, next) por la que pasa cada petición, en el orden
+  // en que se registra: como los filtros de Spring Security en FlowSense. El orden importa.
+
+  // Convierte el cuerpo JSON en req.body. limit: un cuerpo de más de 1 MB responde 413.
+  app.use(express.json({ limit: '1mb' }));
+
+  // Salud: el proceso está vivo y la base responde. Lo consultan los monitores y el balanceador.
+  app.get('/api/salud', async (req, res) => {
+    try {
+      await pool.query('SELECT 1'); // la consulta más barata posible: solo prueba la conexión
+      res.json({ estado: 'ok', db: 'ok' });
+    } catch (err) {
+      console.error('salud: la base no responde:', err.message);
+      // 503 Service Unavailable: "ahora no puedo atender", a diferencia de un 500 (error del código).
+      res.status(503).json({ estado: 'error', db: 'error' });
+    }
+  });
+
+  app.use('/api/motores', rutasMotores());
+
+  // Ninguna ruta respondió: 404 en JSON, igual que el resto de la API (Express respondería en HTML).
+  app.use((req, res) => {
+    res.status(404).json({ error: `No existe ${req.method} ${req.path}` });
+  });
+
+  // Middleware de errores: Express lo reconoce porque tiene CUATRO parámetros. Va al final.
+  // CONCEPTO: en Express 5, un error lanzado (o una promesa rechazada) dentro de una ruta async
+  // llega solo hasta aquí. En Express 4 había que envolver cada ruta con try/catch y next(err).
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    // Si la respuesta ya empezó a enviarse, no se puede cambiar: lo resuelve Express (cierra el socket).
+    if (res.headersSent) return next(err);
+
+    // Errores esperados: su estado y su mensaje.
+    if (err instanceof ErrorHttp) {
+      return res.status(err.estado).json({ error: err.message, detalle: err.detalle });
+    }
+    // express.json() marca así el JSON mal formado ({"codigo": ...) y el cuerpo demasiado grande.
+    if (err.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'JSON mal formado' });
+    }
+    if (err.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'El cuerpo supera 1 MB' });
+    }
+    // Inesperado: todo el detalle al log, nada al cliente.
+    // SEGURIDAD: un stack trace o un mensaje de SQL le dicen a un atacante cómo está hecha la API.
+    console.error(`${req.method} ${req.originalUrl}:`, err);
+    res.status(500).json({ error: 'Error interno' });
+  });
+
+  return app;
+}

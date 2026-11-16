@@ -25,6 +25,13 @@ npm install
 docker compose up -d --wait       # MySQL 8.4; la primera vez crea la base con sql/
 ```
 
+API y pruebas:
+
+```bash
+npm run api:dev                                     # http://localhost:3000/api/salud
+bash src/scripts/preparar-db-test.sh && npm test    # recrea telemetria_test y corre las pruebas
+```
+
 Consultas de práctica sobre la base:
 
 ```bash
@@ -33,4 +40,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 2 · MySQL: modelo de datos y consultas.
+Fase 3 · API base con Express.
