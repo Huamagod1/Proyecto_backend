@@ -71,7 +71,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 
 - [ ] Fase 0 · Entorno de trabajo (1 h)
 - [x] Fase 1 · Git y esqueleto del proyecto (1 h)
-- [ ] Fase 2 · MySQL: modelo de datos y consultas (2–3 h)
+- [x] Fase 2 · MySQL: modelo de datos y consultas (2–3 h)
 - [ ] Fase 3 · API base con Express (2–3 h)
 - [ ] Fase 4 · Seguridad: login, roles, permiso por sitio y auditoría (3 h)
 - [ ] Fase 5 · Ingesta HTTP: validar y no duplicar (2 h)
@@ -1025,6 +1025,7 @@ Las fases 8 y 14, y parte de la 11, no tienen referencia: revisa con más calma 
 | `curl` pide parámetros raros en PowerShell | En PowerShell 5.1, `curl` es `Invoke-WebRequest` | Usa Git Bash, o `curl.exe` |
 | `git push` dice `Permission denied (publickey)` | Tu llave SSH no está en la cuenta Huamagod1 | Fase 0, paso 7 |
 | Cambiaste `sql/` y no pasa nada | Esos archivos corren solo al crear el volumen | `docker compose down -v` (borra los datos) y `docker compose up -d` |
+| En el cliente `mysql` del contenedor, `°C` se ve `�C` | Sin locale, el cliente usa `latin1` | `LANG: C.UTF-8` en el servicio `mysql` (ya está en el Compose), o `--default-character-set=utf8mb4` |
 | `ER_ACCESS_DENIED_ERROR` | Cambiaste `DB_CLAVE` después de crear la base: `003_usuario_app.sh` corre solo al crearla | Recrea el volumen, o cambia la clave como root con `ALTER USER` |
 | El puerto 3306 está ocupado | Arrancó tu servicio `MySQL93` de Windows | Detenlo (`Stop-Service MySQL93` en PowerShell como administrador), o usa `3307:3306` y `DB_PUERTO=3307` |
 | Aviso `ExperimentalWarning` de SQLite | Tu Node es la 24.4 o anterior: ahí `node:sqlite` todavía avisa | `--disable-warning=ExperimentalWarning` en el script, o Node 26 |

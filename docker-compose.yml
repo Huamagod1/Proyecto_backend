@@ -1,0 +1,37 @@
+# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: solo MySQL).
+# Compose lee las ${VARIABLES} de tu .env (misma carpeta), así las claves no quedan escritas aquí.
+# Cada fase agrega lo suyo: Mosquitto (6), simulador y Node-RED (10), API y gateway (12).
+# Uso: docker compose up -d --wait · docker compose ps · docker compose logs -f mysql
+
+# POR QUÉ: nombre fijo del proyecto para contenedores y volúmenes (telemetria-mysql-1,
+# telemetria_datos-mysql). Sin esta línea, Compose usaría el nombre de la carpeta.
+name: telemetria
+
+services:
+  mysql:
+    image: mysql:8.4                                  # versión fija (LTS, soporte hasta 2029): la misma en todos los equipos
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}     # SEGURIDAD: sale de .env, nunca del repositorio
+      MYSQL_DATABASE: telemetria                      # crea la base vacía la primera vez
+      DB_CLAVE: ${DB_CLAVE}                           # la lee sql/003_usuario_app.sh para crear telemetria_app
+      TZ: UTC                                         # POR QUÉ: horas del contenedor sin saltos por cambio de horario
+      LANG: C.UTF-8                                   # OJO: sin esto, el cliente mysql del contenedor usa latin1 y "°C" se ve "�C"
+    command: ["--default-time-zone=+00:00"]           # las sesiones de MySQL también en UTC: NOW() devuelve UTC
+    ports:
+      - "3306:3306"                                   # host:contenedor; si choca con otro MySQL, usa "3307:3306"
+    volumes:
+      - datos-mysql:/var/lib/mysql                    # volumen con nombre: los datos sobreviven aunque se borre el contenedor
+      - ./sql:/docker-entrypoint-initdb.d:ro          # OJO: estos scripts corren solo al crear la base (volumen vacío)
+    healthcheck:
+      # mysqladmin ping por TCP (127.0.0.1): durante la inicialización MySQL solo escucha por socket,
+      # así que el servicio queda "healthy" recién cuando los scripts de sql/ terminaron.
+      # $$ escapa el $ para Compose: la variable la expande el shell dentro del contenedor.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s                                    # cada cuánto se prueba
+      timeout: 3s                                     # cuánto espera cada prueba
+      retries: 20                                     # 20 fallos seguidos → unhealthy
+      start_period: 60s                               # gracia inicial: crear la base toma de 20 a 60 s
+    restart: unless-stopped                           # vuelve solo al reiniciar Docker, salvo que lo detengas tú
+
+volumes:
+  datos-mysql:                                        # Compose lo crea como telemetria_datos-mysql

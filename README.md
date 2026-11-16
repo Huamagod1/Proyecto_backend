@@ -20,12 +20,17 @@ Los apuntes de estudio de cada fase están en [docs/apuntes/](docs/apuntes/).
 ## Cómo levantarlo
 
 ```bash
-cp .env.example .env      # y pon tus claves
+cp .env.example .env              # y pon tus claves
 npm install
+docker compose up -d --wait       # MySQL 8.4; la primera vez crea la base con sql/
 ```
 
-Cada fase agrega aquí sus comandos.
+Consultas de práctica sobre la base:
+
+```bash
+docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" telemetria' < practica/consultas.sql
+```
 
 ## En qué fase va
 
-Fase 1 · esqueleto del proyecto.
+Fase 2 · MySQL: modelo de datos y consultas.
