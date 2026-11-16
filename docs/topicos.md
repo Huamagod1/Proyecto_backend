@@ -38,5 +38,6 @@ solo hasta el broker. QoS 1 asegura "al menos una vez", y los duplicados los abs
 | `api` | leer `motores/#` |
 | `gw-norte` | escribir `motores/norte/#` |
 | `gw-sur` | escribir `motores/sur/#` (publicador CAN de MTR-03, Fase 8) |
+| `nodered` | escribir solo `motores/norte/MTR-02/telemetria` (flujo de Node-RED, Fase 10) |
 
-Las fases 10 y 14 suman `nodered` y `ems`.
+La Fase 14 suma `ems`.

@@ -10,7 +10,8 @@
     "lote-ejemplo": "node src/scripts/generar-lote-ejemplo.js",
     "simulador": "node --env-file=.env src/simulador/motor-modbus.js",
     "gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js",
-    "can": "node --env-file=.env src/scripts/can-a-mqtt.js practica/candump-ejemplo.log"
+    "can": "node --env-file=.env src/scripts/can-a-mqtt.js practica/candump-ejemplo.log",
+    "nodered:desplegar": "node --env-file=.env src/scripts/desplegar-nodered.js"
   },
   "repository": {
     "type": "git",

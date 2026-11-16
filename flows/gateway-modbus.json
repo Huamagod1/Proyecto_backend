@@ -1,0 +1,156 @@
+[
+  {
+    "id": "pestana_gateway",
+    "type": "tab",
+    "label": "Gateway Modbus → MQTT",
+    "disabled": false,
+    "info": "Fase 10: lee MTR-02 del simulador (Unit 2, FC3, 8 registros) cada 2 s, decodifica y publica en motores/norte/MTR-02/telemetria con QoS 1. Sin credenciales: las pone src/scripts/desplegar-nodered.js."
+  },
+  {
+    "id": "cliente_simulador",
+    "type": "modbus-client",
+    "name": "simulador:5020",
+    "clienttype": "tcp",
+    "bufferCommands": true,
+    "stateLogEnabled": false,
+    "queueLogEnabled": false,
+    "failureLogEnabled": true,
+    "tcpHost": "simulador",
+    "tcpPort": "5020",
+    "tcpType": "DEFAULT",
+    "serialPort": "/dev/ttyUSB",
+    "serialType": "RTU-BUFFERD",
+    "serialBaudrate": "9600",
+    "serialDatabits": "8",
+    "serialStopbits": "1",
+    "serialParity": "none",
+    "serialConnectionDelay": "100",
+    "serialAsciiResponseStartDelimiter": "0x3A",
+    "unit_id": "2",
+    "commandDelay": "1",
+    "clientTimeout": "1000",
+    "reconnectOnTimeout": true,
+    "reconnectTimeout": "2000",
+    "parallelUnitIdsAllowed": true,
+    "showErrors": false,
+    "showWarnings": true,
+    "showLogs": true
+  },
+  {
+    "id": "broker_mosquitto",
+    "type": "mqtt-broker",
+    "name": "mosquitto:1883",
+    "broker": "mosquitto",
+    "port": "1883",
+    "clientid": "node-red-gateway",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "closeTopic": "",
+    "closeQos": "0",
+    "closePayload": "",
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": ""
+  },
+  {
+    "id": "cada_2s",
+    "type": "inject",
+    "z": "pestana_gateway",
+    "name": "cada 2 s",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "payload": "",
+    "payloadType": "date",
+    "repeat": "2",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "1",
+    "topic": "",
+    "x": 130,
+    "y": 100,
+    "wires": [
+      [
+        "leer_mtr02"
+      ]
+    ]
+  },
+  {
+    "id": "leer_mtr02",
+    "type": "modbus-getter",
+    "z": "pestana_gateway",
+    "name": "Leer MTR-02 (FC3, 0-7)",
+    "showStatusActivities": true,
+    "showErrors": true,
+    "showWarnings": true,
+    "logIOActivities": false,
+    "unitid": "2",
+    "dataType": "HoldingRegister",
+    "adr": "0",
+    "quantity": "8",
+    "server": "cliente_simulador",
+    "useIOFile": false,
+    "ioFile": "",
+    "useIOForPayload": false,
+    "emptyMsgOnFail": false,
+    "keepMsgProperties": false,
+    "delayOnStart": false,
+    "enableDeformedMessages": false,
+    "startDelayTime": "",
+    "x": 340,
+    "y": 100,
+    "wires": [
+      [
+        "decodificar"
+      ],
+      []
+    ]
+  },
+  {
+    "id": "decodificar",
+    "type": "function",
+    "z": "pestana_gateway",
+    "name": "Decodificar registros",
+    "func": "// funcion-decodificar.js · cuerpo del nodo function \"Decodificar registros\" del flujo de Node-RED (Fase 10).\n// Recibe los 8 holding registers de MTR-02 que entrega el nodo modbus-getter y arma el mismo JSON\n// que publica el gateway en código (docs/topicos.md), con gateway: 'node-red'.\n// Es la misma lógica que src/comun/decodificacion.js, en una sola pieza, porque un nodo function no\n// puede importar módulos del proyecto. Se pega tal cual en el nodo; desplegar-nodered.js la inyecta sola.\n// Variables que da Node-RED: msg (el mensaje), node (para avisos en el panel de depuración).\n\n// msg.payload: los registros leídos con la función 03 desde la dirección 0 (40001).\nconst r = msg.payload;\nconst SIN_DATO = 0x7fff; // \"sin dato\" en un registro simple (sensor cortado): se omite, no se inventa\n\nif (!Array.isArray(r) || r.length < 8) {\n  node.warn(`se esperaban 8 registros y llegaron ${Array.isArray(r) ? r.length : typeof r}`);\n  return null; // return null: el mensaje no sigue al nodo MQTT\n}\n\n// Complemento a dos en 16 bits: de 0x8000 en adelante el registro es negativo (65486 → −50).\nconst aInt16 = (x) => (x >= 0x8000 ? x - 0x10000 : x);\n\nconst lecturas = {};\n// Un registro simple: si no es SIN_DATO, se convierte y se guarda con el nombre de la variable.\nconst simple = (nombre, registro, convertir) => {\n  if (registro !== SIN_DATO) lecturas[nombre] = convertir(registro);\n};\n\nsimple('rpm', r[0], (x) => x);\nsimple('temp_refrigerante', r[1], (x) => aInt16(x) / 10); // ×0,1 °C y con signo\nsimple('presion_aceite', r[2], (x) => x);                 // kPa\nsimple('voltaje_bateria', r[3], (x) => x / 100);          // ×0,01 V\nsimple('carga', r[4], (x) => x);                          // %\n\n// horas_motor: float32 en los registros 5 y 6 con las palabras invertidas (CDAB): el 6 lleva la\n// palabra alta. Buffer está disponible en los nodos function.\nconst b = Buffer.alloc(4);\nb.writeUInt16BE(r[6], 0);\nb.writeUInt16BE(r[5], 2);\nconst horas = b.readFloatBE(0);\nif (!Number.isNaN(horas)) lecturas.horas_motor = Math.round(horas * 100) / 100;\n\nsimple('alarmas', r[7], (x) => x); // 16 bits, uno por alarma\n\n// El nodo mqtt out convierte el objeto en JSON al publicar.\nmsg.payload = { motor: 'MTR-02', gateway: 'node-red', ts: new Date().toISOString(), lecturas };\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 570,
+    "y": 100,
+    "wires": [
+      [
+        "publicar"
+      ]
+    ]
+  },
+  {
+    "id": "publicar",
+    "type": "mqtt out",
+    "z": "pestana_gateway",
+    "name": "MTR-02 telemetría (QoS 1)",
+    "topic": "motores/norte/MTR-02/telemetria",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker_mosquitto",
+    "x": 810,
+    "y": 100,
+    "wires": []
+  }
+]

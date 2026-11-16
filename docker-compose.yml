@@ -1,4 +1,5 @@
-# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: MySQL; Fase 6: Mosquitto).
+# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: MySQL; Fase 6: Mosquitto;
+# Fase 10: simulador y Node-RED, en el perfil "nodered": docker compose --profile nodered up -d).
 # Compose lee las ${VARIABLES} de tu .env (misma carpeta), así las claves no quedan escritas aquí.
 # Cada fase agrega lo suyo: Mosquitto (6), simulador y Node-RED (10), API y gateway (12).
 # Uso: docker compose up -d --wait · docker compose ps · docker compose logs -f mysql
@@ -43,6 +44,44 @@ services:
       - datos-mosquitto:/mosquitto/data               # persistencia: sesiones y mensajes QoS 1 pendientes
     restart: unless-stopped
 
+  # Fase 10: el simulador dentro de Compose, para que Node-RED lo alcance por su nombre (simulador:5020).
+  # Temporal: la Fase 12 lo reemplaza por la imagen del proyecto.
+  simulador:
+    image: node:26-trixie-slim                        # Node 26 LTS sobre Debian 13, versión slim (sin herramientas de compilación)
+    profiles: ["nodered"]                             # POR QUÉ: solo se levanta con --profile nodered; así no choca con `npm run simulador`
+    working_dir: /app
+    # npm ci --omit=dev: instala las dependencias de producción desde package-lock.json, en Linux.
+    command: sh -c "npm ci --omit=dev --no-audit --no-fund && node src/simulador/motor-modbus.js"
+    environment:
+      SIMULADOR_HOST: 0.0.0.0                         # escucha en la red del contenedor, no solo en su localhost
+    ports:
+      - "127.0.0.1:5020:5020"                         # SEGURIDAD: solo desde tu equipo; el gateway en código lo usa en 127.0.0.1
+    volumes:
+      - .:/app                                        # el código del proyecto, tal como está en tu disco
+      # OJO: volumen anónimo encima de node_modules: el contenedor usa el suyo (Linux) y no el de Windows.
+      - /app/node_modules
+    restart: unless-stopped
+
+  nodered:
+    image: nodered/node-red:5.0                       # Node-RED 5.0 con Node 24; node-red-contrib-modbus exige Node 22 o superior
+    profiles: ["nodered"]
+    environment:
+      TZ: UTC                                         # horas del contenedor sin saltos de horario
+    # Las credenciales MQTT del flujo NO van aquí: las inyecta src/scripts/desplegar-nodered.js al
+    # desplegar, y Node-RED las guarda cifradas en /data (flows_cred.json).
+    # OJO: Node-RED no reemplaza ${VARIABLES} dentro de las credenciales, solo en las demás propiedades.
+    ports:
+      # SEGURIDAD: solo desde tu equipo. El editor no tiene contraseña y un nodo function ejecuta
+      # código: abierto a la red, cualquiera podría correr programas en el contenedor.
+      - "127.0.0.1:1880:1880"
+    volumes:
+      - datos-nodered:/data                           # flujos, nodos instalados (node-red-contrib-modbus) y configuración
+    depends_on:
+      - simulador
+      - mosquitto
+    restart: unless-stopped
+
 volumes:
   datos-mysql:                                        # Compose lo crea como telemetria_datos-mysql
   datos-mosquitto:                                    # sobrevive a reinicios y a docker compose down (sin -v)
+  datos-nodered:                                      # el /data de Node-RED (Fase 10)

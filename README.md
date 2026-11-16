@@ -37,6 +37,14 @@ npm run gateway      # lee Modbus, guarda en SQLite y publica por MQTT
 npm run can          # decodifica practica/candump-ejemplo.log (J1939) y publica MTR-03
 ```
 
+Node-RED (MTR-02 en bloques; con esto activo, deja `GATEWAY_EQUIPOS=1:MTR-01` en tu `.env`):
+
+```bash
+docker compose --profile nodered up -d                                      # simulador en contenedor + Node-RED
+docker compose exec -w /data nodered npm install node-red-contrib-modbus    # solo la primera vez
+docker compose restart nodered && npm run nodered:desplegar                 # editor en http://127.0.0.1:1880
+```
+
 Dashboard en vivo: abre http://localhost:3000 e inicia sesión (por ejemplo, `ing-norte` con la clave
 `CLAVE_ING_NORTE` de tu `.env`). Cada usuario ve solo los motores de su sitio.
 
@@ -64,4 +72,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 9 · Tiempo real: WebSocket y dashboard.
+Fase 10 · Node-RED: el gateway en bloques.

@@ -16,3 +16,7 @@ topic write motores/norte/#
 # El publicador CAN del sitio sur (Fase 8, MTR-03): solo escribe en su sitio.
 user gw-sur
 topic write motores/sur/#
+
+# Node-RED (Fase 10): solo la telemetría de MTR-02, el único equipo que lee su flujo.
+user nodered
+topic write motores/norte/MTR-02/telemetria

@@ -36,6 +36,7 @@ echo "Creando mosquitto/passwd"
 passwd_mqtt -c -b /mosquitto/config/passwd "$MQTT_USUARIO" "$MQTT_CLAVE"                   # -c: crea el archivo (borra el anterior)
 passwd_mqtt -b /mosquitto/config/passwd "$GATEWAY_MQTT_USUARIO" "$GATEWAY_MQTT_CLAVE"     # sin -c: agrega
 passwd_mqtt -b /mosquitto/config/passwd "$CAN_MQTT_USUARIO" "$CAN_MQTT_CLAVE"             # Fase 8: CAN del sitio sur
+passwd_mqtt -b /mosquitto/config/passwd "$MQTT_NODERED_USUARIO" "$MQTT_NODERED_CLAVE"     # Fase 10: flujo de Node-RED
 
 # El acl también debe ser del usuario mosquitto y no legible por otros; si no, el broker avisa que
 # "una versión futura rechazará el archivo". Docker Desktop guarda este dueño y estos permisos

@@ -79,7 +79,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 - [x] Fase 7 · Terreno: simulador Modbus y gateway con buffer (3–4 h)
 - [x] Fase 8 · CAN y J1939: decodificar tramas del motor (1–2 h)
 - [x] Fase 9 · Tiempo real: WebSocket y dashboard (2–3 h)
-- [ ] Fase 10 · Node-RED: el gateway en bloques (1–2 h)
+- [x] Fase 10 · Node-RED: el gateway en bloques (1–2 h)
 - [ ] Fase 11 · SQL con volumen: millones de filas (3 h)
 - [ ] Fase 12 · Docker: todo con un comando (2 h)
 - [ ] Fase 13 · Linux: despliegue como servicio (3 h)
@@ -739,8 +739,8 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
    - el puerto `5020:5020` publicado, para que tu gateway en código lo siga alcanzando en `127.0.0.1`.
 2. Agrega `nodered` a Compose: la imagen `nodered/node-red:5.0`, el puerto 1880 y un volumen para `/data`. La 5.0 trae Node 24, y `node-red-contrib-modbus` exige Node 22 o superior.
 3. En http://localhost:1880, abre *Manage palette* e instala `node-red-contrib-modbus`.
-4. Arma el flujo **inject (cada 2 s) → Modbus Read → function → mqtt out**:
-   - *Modbus Read*: servidor `simulador:5020`, Unit ID 2, FC3, dirección 0 y cantidad 8;
+4. Arma el flujo **inject (cada 2 s) → Modbus Getter → function → mqtt out**:
+   - *Modbus Getter*: servidor `simulador:5020`, Unit ID 2, FC3, dirección 0 y cantidad 8. *Modbus Read* no sirve aquí porque sondea solo y no acepta entradas; con un inject se usa el Getter. OJO: el inject debe mandar un payload (por ejemplo, la hora), porque el Getter descarta en silencio los mensajes sin payload;
    - *function*: el agente escribe la decodificación comentada en `flows/funcion-decodificar.js` (int16, escalas, float CDAB y el mismo JSON de siempre, con `gateway: 'node-red'`), y tú la pegas en el nodo;
    - *mqtt out*: broker `mosquitto:1883`, tópico `motores/norte/MTR-02/telemetria` y QoS 1. Usa una credencial si activaste la seguridad en la Fase 6.
 5. Mientras tanto, configura tu gateway en código para leer solo MTR-01 (`GATEWAY_EQUIPOS=1:MTR-01`), así no duplicas MTR-02.
