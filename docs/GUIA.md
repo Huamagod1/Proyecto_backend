@@ -12,6 +12,19 @@ maneja el tema y quiere dominarlo rápido.
 - **En una tarde:** suma la sección 5, una herramienta a la vez y con el archivo abierto al lado.
 - **Para dominarlo:** sigue la ruta de la sección 12, que combina leer, ejecutar y romper a propósito.
 
+### Cómo leer los diagramas
+
+Todos siguen las mismas convenciones, y cada uno trae debajo su explicación paso a paso.
+
+| Tipo | Cómo se lee |
+|---|---|
+| **Flujo** (cajas y flechas) | Una caja es un programa o un paso; un cilindro guarda datos; un rombo es una decisión; un recuadro con título agrupa lo que corre en un mismo lugar. La flecha indica hacia dónde va el dato, y su texto dice el protocolo o la condición. Una flecha punteada es un camino opcional. |
+| **Secuencia** (columnas) | Cada columna es un participante y el tiempo corre hacia abajo. Flecha llena: un envío o un pedido. Flecha punteada: una respuesta. Flecha que vuelve a su columna: trabajo interno. `alt` muestra caminos alternativos y `loop`, algo que se repite. |
+| **Entidad-relación** (tablas) | Cada caja es una tabla con sus columnas. Los extremos de las líneas dicen cuántos: una raya es "uno", una pata de gallo es "muchos". |
+| **Estados** | Cada caja es un estado y cada flecha, un cambio de estado con su condición. El punto negro es el inicio. |
+| **Git** | Cada punto es un commit, cada línea es una rama y las uniones son merges. Las etiquetas son tags (versiones). |
+| **Dibujo de texto** (en un bloque de código) | Muestra cómo se arma un dato por dentro: un mensaje, un token o una trama. Las llaves `└──┘` agrupan una parte y la flecha `←` le pone nombre. |
+
 ## Índice
 
 1. [La idea en un minuto](#1-la-idea-en-un-minuto)
@@ -93,6 +106,42 @@ flowchart LR
   BRK -.->|"MQTT de solo lectura"| EXT
 ```
 
+**Cómo leer este diagrama.** Se lee de izquierda a derecha, en el sentido en que viajan los datos.
+Los cuatro recuadros son **zonas** (dónde corre cada cosa); las cajas son **programas**; los
+cilindros **guardan datos**; y el texto de cada flecha es el **protocolo**, el idioma con que se
+hablan dos piezas. La flecha punteada es un camino opcional.
+
+**El recorrido, tramo por tramo:**
+1. El gateway y Node-RED **preguntan** al simulador por Modbus; el decodificador CAN **lee** el log J1939.
+2. Los tres **publican** cada lectura en Mosquitto por MQTT.
+3. Mosquitto se la **entrega** a la API, que la valida y la guarda en MySQL.
+4. La API la **empuja** al dashboard por WebSocket y la **sirve** a SCADA o EMS con una API REST.
+   Un EMS también podría escuchar MQTT directo.
+
+**Qué es cada pieza:**
+
+| Pieza | Qué es | Qué hace aquí |
+|---|---|---|
+| Simulador Modbus TCP | Un programa que imita el controlador (PLC) de dos motores | Responde 8 registros por motor cuando le preguntan |
+| Log CAN J1939 | Un archivo grabado del bus CAN de un tercer motor | Es la fuente de datos de MTR-03 |
+| Gateway | El traductor de la faena | Lee Modbus cada 5 s, guarda en su buffer y publica por MQTT |
+| Buffer SQLite | Una base de datos en un archivo, dentro del gateway | Guarda cada mensaje hasta que el broker confirma que lo recibió |
+| Node-RED | Una herramienta para programar con bloques | Hace lo mismo que el gateway para MTR-02, armado visualmente |
+| can-a-mqtt.js | Un script de Node | Traduce las tramas J1939 a mensajes MQTT |
+| Mosquitto | Un broker MQTT: el servidor de mensajería | Recibe mensajes por tópico y los reparte a quien esté suscrito |
+| API Node.js + Express 5 | El servidor central, escrito en JavaScript | Valida, guarda, controla el acceso, audita y avisa |
+| MySQL 8.4 | Una base de datos relacional | Guarda la historia, el último valor, los usuarios y la auditoría |
+| Dashboard web | Una página en el navegador | Muestra los valores en vivo |
+| SCADA / EMS | Sistemas externos. SCADA supervisa y controla la planta; un EMS (Energy Management System) gestiona la energía, por ejemplo cuántos grupos encender | Consumen los datos de la plataforma |
+
+**Los protocolos de las flechas:**
+- **Modbus TCP, función 03:** pregunta y respuesta para leer registros de un equipo industrial.
+- **MQTT QoS 1:** publicar un mensaje en un tópico, con acuse de recibo; llega al menos una vez.
+- **Sesión persistente:** el broker guarda los mensajes mientras la API está desconectada.
+- **SQL:** el lenguaje para leer y escribir en MySQL.
+- **WebSocket:** una conexión que queda abierta para empujar datos al navegador.
+- **REST con X-API-Key:** peticiones HTTP normales, autenticadas con una clave por sistema.
+
 **Las cuatro capas, de izquierda a derecha:**
 
 - **Terreno.** Los datos nacen en los equipos. El gateway pregunta cada 5 segundos, traduce los
@@ -146,6 +195,33 @@ sequenceDiagram
   T->>W: Difunde por WebSocket solo a quien puede ver ese sitio
 ```
 
+**Cómo leer este diagrama.** Es un diagrama de secuencia: cada columna es un participante y el
+tiempo corre hacia abajo. Una flecha llena es un envío; una punteada, una respuesta; una que vuelve a
+su propia columna, trabajo interno. Los números marcan el orden.
+
+**El recorrido en cinco etapas:**
+1. **Leer (pasos 1 a 3).** El gateway le pide 8 registros al PLC y recibe 8 números crudos (`h0` y `h1`
+   son las dos mitades del valor de horas). Luego los **decodifica**: aplica escalas (852 → 85,2 °C),
+   el signo y el formato del float.
+2. **Asegurar (4 a 7).** Antes de enviar, guarda el mensaje en su buffer SQLite. Publica y espera el
+   **PUBACK**, el acuse de recibo del broker. Recién entonces lo borra: si algo falla en medio, el
+   mensaje sigue guardado.
+3. **Recibir (8 y 9).** El broker se lo entrega a la API, que revisa la forma con **zod** y cada lectura
+   con **evaluarLectura** (motor, sitio, variable, hora y rango).
+4. **Guardar (10 a 12).** El **loteador** junta filas y las escribe en un solo INSERT, más el **upsert**
+   del último valor, dentro de una **transacción**. El **commit** confirma que todo quedó guardado.
+5. **Mostrar (13).** Solo después del commit, la API envía el dato por WebSocket a los dashboards que
+   pueden ver ese sitio.
+
+**Lo que aparece:**
+- **PUBLISH y PUBACK:** el envío de un mensaje MQTT y su acuse de recibo.
+- **QoS 1:** el nivel de entrega "al menos una vez": sin PUBACK, se reenvía.
+- **zod:** la librería que revisa que los datos tengan la forma esperada.
+- **evaluarLectura:** la regla del proyecto que decide si una lectura se guarda.
+- **Loteador:** junta muchas filas para escribirlas de una vez.
+- **Upsert:** insertar o, si ya existe, actualizar.
+- **Transacción y commit:** varias escrituras que se confirman juntas (commit) o se deshacen juntas.
+
 | Pasos | Archivo | Qué aprender ahí |
 |---|---|---|
 | 1 a 3 | `src/gateway/gateway.js`, `src/comun/decodificacion.js` | Modbus, complemento a dos, orden de palabras de un float |
@@ -161,6 +237,10 @@ sequenceDiagram
 { "motor": "MTR-01", "gateway": "gw-norte", "ts": "2026-11-16T13:07:58.828Z",
   "lecturas": { "rpm": 1500, "temp_refrigerante": 85.2, "presion_aceite": 420 } }
 ```
+
+Cada mensaje dice de qué motor es, qué gateway lo envió, cuándo se midió y cuánto valió cada variable.
+La hora (`ts`) va en UTC: la `Z` final significa hora universal. La API convierte cada mensaje en una
+fila por variable.
 
 **Hay un segundo camino, por HTTP:** un gateway que no habla MQTT puede mandar un lote con
 `POST /api/lecturas`. Pasa por la misma validación (`evaluarLectura`) y el mismo guardado (`guardarLote`).
@@ -202,6 +282,12 @@ Proyecto_backend/
 └── README.md · PLAN.md · PROGRESO.md · AGENTS.md
 ```
 
+**Cómo leer este mapa.** Cada línea es una carpeta (termina en `/`) o un archivo; las rayas `├──` y
+`└──` muestran qué va dentro de qué, y a la derecha está para qué sirve. De `src/` salen **tres
+programas** que corren por separado: la API (`src/api`), el gateway (`src/gateway`) y el simulador
+(`src/simulador`). `src/comun` es el código que comparten, y `src/scripts`, las herramientas que se
+ejecutan a mano.
+
 `.env` (tus claves) y `datos/` (buffer, respaldos y claves de API) viven solo en tu equipo: Git los ignora.
 
 ---
@@ -224,6 +310,20 @@ flowchart LR
   SO -->|"cuando termina,<br/>deja el aviso"| C["Cola de eventos"]
   C -->|"el event loop toma<br/>el siguiente aviso"| P
 ```
+
+**Cómo leer este diagrama.** Es un ciclo que se repite sin parar:
+1. Tu código pide algo lento: una consulta a MySQL, un mensaje por la red o leer un archivo.
+2. **libuv** se encarga por debajo, junto al sistema operativo, y Node sigue atendiendo otras cosas.
+3. Cuando lo lento termina, deja un aviso en la **cola de eventos**.
+4. El **event loop** toma los avisos de a uno y continúa el código que esperaba (lo que sigue a un `await`).
+
+**Lo que aparece:**
+- **Hilo:** una línea de ejecución. Node usa uno solo para tu código.
+- **I/O (entrada y salida):** red, disco y base de datos. Es lo lento.
+- **Event loop:** el ciclo que reparte el turno entre todo lo pendiente.
+
+**Por qué importa:** con un solo hilo, la API atiende cientos de peticiones mientras espera a MySQL.
+Pero un cálculo largo sin pausas (un bucle de millones de vueltas) sí lo bloquea todo.
 
 **De qué se compone:**
 - **V8:** el motor que ejecuta JavaScript (el mismo de Chrome).
@@ -306,16 +406,34 @@ middlewares** y responde JSON.
 **Anatomía de una petición y su respuesta:**
 
 ```
-POST /api/motores HTTP/1.1                    ← método y ruta
-Authorization: Bearer eyJhbGciOiJIUzI1Ni...   ← encabezados
+── petición: la envía el cliente ─────────────
+POST /api/motores HTTP/1.1                    ← método, ruta y versión
+Authorization: Bearer eyJhbGciOiJIUzI1Ni...   ← encabezados, uno por línea
 Content-Type: application/json
-
+                                              ← línea en blanco: fin de los encabezados
 {"codigo":"MTR-10","modelo":"12V4000","sitio_id":1}     ← cuerpo (body)
 
-HTTP/1.1 201 Created                          ← código de estado
+── respuesta: la devuelve la API ─────────────
+HTTP/1.1 201 Created                          ← versión y código de estado
 Location: /api/motores/MTR-10                 ← encabezado: dónde quedó el recurso nuevo
+Content-Type: application/json; charset=utf-8
+
 {"codigo":"MTR-10","modelo":"12V4000","sitio_id":1,"sitio":"norte"}
 ```
+
+**Cómo leer este dibujo.** Arriba va la petición y abajo, la respuesta. Las dos tienen las mismas
+cuatro partes, en el mismo orden:
+1. **La primera línea.** En la petición: el **método** (qué quieres hacer), la **ruta** (sobre qué
+   recurso) y la versión del protocolo (`HTTP/1.1`). En la respuesta: la versión y el **código de
+   estado** (cómo salió).
+2. **Los encabezados (headers).** Datos sobre el mensaje, uno por línea, con la forma `Nombre: valor`.
+   `Authorization` lleva el token y `Content-Type` dice en qué formato viene el cuerpo.
+3. **Una línea en blanco**, que marca el fin de los encabezados.
+4. **El cuerpo (body).** Los datos en sí, en **JSON**: texto con pares `"nombre": valor` entre llaves.
+   Una petición `GET` no lleva cuerpo.
+
+**Los métodos que usa el proyecto:** `GET` lee, `POST` crea, `PUT` actualiza y `DELETE` borra. En los
+motores, `DELETE` hace una **baja lógica**: marca el motor como inactivo y conserva su historia.
 
 **Los códigos de estado que usa el proyecto:**
 
@@ -356,6 +474,26 @@ flowchart TD
   RT -->|"se lanzó un error"| ER["Manejador de errores<br/>(cuatro parámetros)"]
   ER --> RE(["400, 401, 403, 404, 409,<br/>422, 429 o 500"])
 ```
+
+**Cómo leer este diagrama.** Se lee de arriba hacia abajo. Las cajas redondeadas son la entrada y las
+salidas posibles; las rectangulares, los pasos; el rombo, una decisión. Cada petición recorre los pasos
+en orden, hasta que alguno responde.
+
+**Qué hace cada paso:**
+1. **helmet:** agrega encabezados de seguridad a la respuesta, por ejemplo qué scripts puede ejecutar el navegador.
+2. **express.static:** si se pide un archivo del dashboard (`index.html`, `app.js`), lo entrega y la cadena termina ahí.
+3. **registrarAcceso:** deja preparada la anotación de la auditoría, que se escribe cuando la respuesta termina.
+4. **express.json:** convierte el texto JSON del cuerpo en un objeto (`req.body`). Si el JSON está roto,
+   salta directo al manejador de errores (400).
+5. **Rutas:** cada grupo de rutas tiene sus propios pasos: `autenticar` (el token), `autorizar` (el rol)
+   y `validar` (zod). Al final viene la lógica.
+6. **404:** si ninguna ruta coincidió.
+7. **Manejador de errores:** recibe cualquier error lanzado y lo traduce al código HTTP correcto. Un error
+   inesperado sale como 500, y el detalle va al log.
+
+**Lo que aparece:**
+- **Middleware:** una función por la que pasa cada petición; con `next()` deja pasar al paso siguiente.
+- **Encabezados (headers):** datos extra de una petición o de una respuesta, como `Authorization` o `Content-Type`.
 
 **Sintaxis mínima:**
 
@@ -634,6 +772,20 @@ eyJhbGciOiJIUzI1NiIs...  .  eyJ1c3VhcmlvIjoiaW5nLW5vcnRlIiwicm9s...  .  q2J8vX..
  "typ":"JWT"}                "sitio":1,"sub":"2","exp":1794834222}                     JWT_SECRETO)
 ```
 
+**Cómo leer este dibujo.** La primera fila es el token tal como viaja. La segunda nombra sus tres
+partes y la tercera muestra qué hay dentro de cada una:
+1. **Encabezado:** con qué algoritmo se firmó (`HS256`) y qué tipo de token es.
+2. **Contenido (payload):** los datos, que se llaman *claims*. `usuario`, `rol` y `sitio` son del
+   proyecto. `sub` (*subject*) es el id del usuario, y `exp`, el vencimiento, en segundos desde el
+   1 de enero de 1970 (hora Unix).
+3. **Firma:** un **HMAC-SHA256**, una huella de las dos primeras partes calculada con `JWT_SECRETO`,
+   que solo conoce la API. Si alguien cambia una letra del contenido (por ejemplo, para darse
+   `"rol":"admin"`), la firma deja de calzar y la API responde 401.
+
+**base64url** escribe cualquier dato con letras, números, `-` y `_`, para que viaje sin problemas en
+una URL o un encabezado. Es una **codificación**, no un cifrado: se revierte sin clave. Por eso un JWT
+nunca lleva secretos.
+
 **Login y uso del token:**
 
 ```mermaid
@@ -650,6 +802,22 @@ sequenceDiagram
   A->>A: autorizar revisa el rol y el SQL filtra por sitio
   A-->>N: 200 con los motores de su sitio
 ```
+
+**Cómo leer este diagrama.** Hay dos momentos: arriba el **login** (una vez) y abajo **cada petición** posterior.
+1. El navegador manda usuario y clave a `/api/auth/login`.
+2. La API busca en MySQL el **hash** guardado de ese usuario. Nunca guarda ni lee la clave en sí.
+3. `bcrypt.compare` calcula el hash de la clave recibida y lo compara con el guardado.
+4. Si coinciden, la API responde un **token JWT** que vence en 15 minutos.
+5. En cada petición siguiente, el navegador manda el token en el encabezado `Authorization: Bearer <token>`.
+6. **autenticar** revisa la firma y el vencimiento del token. Así sabe quién eres sin volver a la base.
+7. **autorizar** revisa tu rol, y el SQL agrega el filtro de tu sitio.
+8. La respuesta trae solo lo tuyo.
+
+**Lo que aparece:**
+- **Hash:** una huella de una sola vía: de la clave sale el hash, pero del hash no se puede volver a la clave.
+- **bcrypt:** el algoritmo de hash para contraseñas; es lento a propósito, para frenar los ataques.
+- **Token JWT:** un "pase" firmado por la API que dice quién eres, tu rol y tu sitio.
+- **Bearer:** "portador": quien presenta el token lo usa.
 
 **Las piezas:**
 - **bcrypt (costo 12):** guarda una huella lenta y con sal de cada contraseña. SHA-256 sirve para
@@ -679,6 +847,20 @@ flowchart LR
   B -->|"suscrita a<br/>motores/+/+/telemetria"| API["API"]
   B -->|"suscrito a todo<br/>lo del sitio norte"| EMS["EMS del norte"]
 ```
+
+**Cómo leer este diagrama.** A la izquierda están los que **publican**, al centro el **broker** y a la
+derecha los **suscritos**. El texto de cada flecha es un tópico: hacia el broker, dónde se publica;
+desde el broker, a qué se suscribió cada uno.
+
+**La idea clave:** los gateways no saben quién los escucha, y la API no sabe quién publica. Solo
+comparten los tópicos. Por eso se pueden agregar consumidores (un EMS) o fuentes (Node-RED) sin tocar
+las demás piezas. Eso es el **desacoplamiento**.
+
+**Lo que aparece:**
+- **Publicar:** enviar un mensaje a un tópico.
+- **Suscribirse:** pedirle al broker los mensajes de uno o más tópicos.
+- **Broker (Mosquitto):** el intermediario que recibe y reparte; también aplica los usuarios y permisos (ACL).
+- **`+`:** comodín de un nivel del tópico: `motores/+/+/telemetria` calza con la telemetría de cualquier sitio y motor.
 
 **Conceptos:**
 
@@ -712,6 +894,19 @@ sequenceDiagram
   Note over P,B: Si el PUBACK no llega, el gateway reenvía y puede haber un duplicado. La base lo absorbe.
 ```
 
+**Cómo leer este diagrama.** Hay dos tramos independientes, cada uno con su propio acuse de recibo:
+del gateway al broker, y del broker a la API.
+1. El gateway publica con **QoS 1** y un número de mensaje (id 7).
+2. El broker responde **PUBACK** con el mismo id: "lo tengo".
+3. El broker reenvía el mensaje a cada suscrito, también con QoS 1.
+4. La API responde su propio PUBACK.
+
+**Lo que aparece:**
+- **QoS (Quality of Service):** el nivel de garantía de entrega. Con QoS 1, si no llega el acuse, se reenvía.
+- **Id del mensaje:** un número que empareja cada envío con su acuse.
+- **Duplicado:** si se pierde el PUBACK, el mensaje ya había llegado y se reenvía igual. Por eso la base
+  tiene que ser **idempotente**: la PK ignora la lectura repetida.
+
 **La sesión persistente, en acción** (probado: 20 mensajes con la API apagada, llegaron los 20):
 
 ```mermaid
@@ -727,6 +922,21 @@ sequenceDiagram
   B-->>A: CONNACK, sesión presente
   B->>A: Entrega los 20 mensajes guardados
 ```
+
+**Cómo leer este diagrama.**
+1. La API se conecta con un **clientId** fijo (`api-ingesta`) y `clean: false`, que significa
+   "recuérdame", y se suscribe con QoS 1.
+2. La nota marca el problema: la API se cae o se reinicia.
+3. El gateway sigue publicando. El broker ve que `api-ingesta` está suscrita pero desconectada, y
+   **guarda** los mensajes en la cola de esa sesión (y en disco, por `persistence true`).
+4. La API vuelve con el mismo clientId. El **CONNACK** dice "sesión presente": el broker la recordó.
+5. El broker entrega todo lo guardado, en orden.
+
+**Lo que aparece:**
+- **clientId:** el nombre con que el broker reconoce a un cliente. Si dos procesos usan el mismo, se expulsan entre sí.
+- **CONNECT y CONNACK:** el pedido de conexión y la respuesta del broker.
+- **Cola de la sesión:** los mensajes que esperan a un cliente desconectado. El tope es
+  `max_queued_messages` (100.000 en este proyecto).
 
 **Configuración de Mosquitto** (`mosquitto/mosquitto.conf` y `mosquitto/acl`):
 
@@ -798,6 +1008,21 @@ Respuesta: función 03, 16 bytes de datos (8 registros × 2 bytes)
                         1500    852     420    2685    64     reg5    reg6    alarmas
 ```
 
+**Cómo leer este dibujo.** Cada par de caracteres es un **byte** (8 bits: un número de 0 a 255)
+escrito en **hexadecimal**, la base 16, que usa los dígitos 0 a 9 y las letras A a F (`0A` = 10,
+`10` = 16, `FF` = 255). El prefijo `0x` marca un número hexadecimal. Un registro ocupa dos bytes:
+`05 DC` = `0x05DC` = 1500.
+- **Encabezado MBAP** (*Modbus Application Protocol*), que solo existe en Modbus TCP. La
+  **transacción** empareja cada respuesta con su pregunta; el **protocolo** siempre es 0 (Modbus); el
+  **largo** cuenta los bytes que vienen después, incluido el unit (aquí, 6); y el **unit** es el
+  Unit ID del equipo.
+- **PDU** (*Protocol Data Unit*): la pregunta en sí, igual en TCP y en RS485. Lleva la función (03),
+  la dirección de inicio (0) y la cantidad de registros (8).
+- **La respuesta** empieza con el mismo MBAP (resumido como `...`), repite el unit y la función, dice
+  cuántos bytes de datos trae (`10` = 16) y entrega los 8 registros, de dos bytes cada uno. Debajo va
+  cada valor en decimal. Los registros 5 y 6 se leen juntos, porque forman el float32 de las horas, y
+  el 7 trae las alarmas (0 = ninguna).
+
 **El mapa de registros del proyecto:**
 
 | Registro | Variable | Tipo | Escala | Ejemplo |
@@ -823,6 +1048,14 @@ Respuesta: función 03, 16 bytes de datos (8 registros × 2 bytes)
    CDAB: registro 5 = 0xE6AE, registro 6 = 0x4640     ← así lo manda el simulador
    Leer CDAB como si fuera ABCD da −4,1 × 10²³, sin ningún error: el bug clásico.
 ```
+
+**En simple:**
+- Un registro solo guarda enteros de 0 a 65.535. Para enviar negativos, el equipo y quien lo lee
+  acuerdan que la mitad de arriba (32.768 a 65.535) representa del −32.768 al −1. Ese acuerdo es el
+  **complemento a dos**, y el tipo se llama **int16**.
+- Un **float32** (un número con decimales, de 4 bytes) no cabe en un registro, así que viaja en dos, y
+  cada fabricante elige en qué orden van las mitades. El manual del equipo dice cuál usa; si no lo
+  dice, se prueba con un valor conocido.
 
 **Sintaxis** (`modbus-serial`):
 
@@ -855,6 +1088,17 @@ PF ≥ 240 → el mensaje es para todos y el PGN incluye a PS:
 PGN = 0xF0 × 256 + 0x04 = 0xF004 = 61444 → EEC1 (velocidad del motor)
 ```
 
+**Cómo leer este dibujo.** El identificador `0x0CF00400` es un número de 29 bits que se reparte en
+seis campos, de izquierda a derecha. La primera fila nombra cada campo; la segunda, sus bits; y la
+tercera, su valor en decimal.
+- **Prioridad** (3 bits): de 0 a 7; mientras más bajo, más urgente. Aquí, 3.
+- **R y DP** (1 bit cada uno): un bit reservado y la página de datos. Aquí, ambos en 0.
+- **PF** (*PDU Format*) y **PS** (*PDU Specific*), de 8 bits cada uno: juntos dicen qué mensaje es.
+- **SA** (*Source Address*, 8 bits): quién lo envía. 0 es el motor.
+
+Si PF es 240 o más, el mensaje es un **anuncio para todos** (broadcast) y PS forma parte del número
+del mensaje, el **PGN**. Si PF es menor, PS es la dirección del destinatario.
+
 | Término | Qué es | Ejemplo |
 |---|---|---|
 | PGN | Qué mensaje es | 61444 = EEC1, 65262 = ET1 |
@@ -870,6 +1114,14 @@ datos:   F0  7D  7D  E0  2E  FF  FF  FF
 SPN 190 = bytes 4 y 5 (índices 3 y 4) = E0 2E → little-endian → 0x2EE0 = 12.000
 12.000 × 0,125 rpm/bit = 1500 rpm      (0xFFFF = "no disponible" → null)
 ```
+
+**Cómo leerlo.** Una trama CAN trae hasta 8 bytes de datos. J1939 define en qué bytes va cada
+variable (su SPN) y cuánto vale cada unidad:
+1. **Ubicar** los bytes: la norma los cuenta desde 1 y el código desde 0. Por eso los "bytes 4 y 5"
+   son los índices 3 y 4.
+2. **Juntarlos al revés**, porque J1939 es little-endian: `E0 2E` → `0x2EE0`.
+3. **Pasar** de hexadecimal a decimal: `0x2EE0` = 12.000.
+4. **Multiplicar** por la escala de la norma, 0,125 rpm por unidad: 1500 rpm.
 
 **El formato de `candump`** (`practica/candump-ejemplo.log`):
 
@@ -907,6 +1159,24 @@ sequenceDiagram
   end
 ```
 
+**Cómo leer este diagrama.** El bloque `alt` muestra dos caminos posibles (token válido o no) y el
+bloque `loop`, algo que se repite. La flecha de punta abierta es un envío que no espera respuesta.
+1. El navegador hace un GET normal a `/ws`, con el encabezado `Upgrade: websocket` ("cambiemos de
+   protocolo") y el token en la URL.
+2. En producción, nginx lo reenvía conservando los encabezados `Upgrade` y `Connection`. Sin ellos, el
+   cambio fallaría.
+3. La API verifica el token **antes** de aceptar.
+4. **Si es válido,** responde **101 Switching Protocols**. Desde ahí la conexión queda abierta y la API
+   envía datos cada vez que hay algo nuevo. Cada 30 s manda un **ping** y el navegador responde
+   **pong**; quien no responde se da por desconectado.
+5. **Si no es válido,** responde 401 y cierra.
+
+**Lo que aparece:**
+- **Upgrade:** el pedido para pasar de HTTP a WebSocket en la misma conexión.
+- **101 Switching Protocols:** la respuesta que acepta el cambio.
+- **Ping y pong:** el latido que detecta las conexiones muertas.
+- **nginx:** el servidor que va delante de la API en producción (sección 5.14).
+
 **Los mensajes que recibe el dashboard:** `bienvenida` (quién eres), `lecturas` (últimos valores de un
 motor), `gateway` (`online` u `offline`) y `alerta` (un motor se calló o volvió).
 
@@ -942,6 +1212,22 @@ flowchart LR
   F -->|"msg.payload =<br/>JSON del mensaje"| Q["mqtt out<br/>motores/norte/MTR-02/telemetria<br/>QoS 1"]
 ```
 
+**Cómo leer este diagrama.** Cada caja es un **nodo**, y cada cable lleva un objeto **`msg`**. El texto
+de los cables dice qué trae `msg.payload` en ese tramo.
+1. **inject:** un reloj que dispara un mensaje cada 2 s. Su payload es la hora; sin payload, el nodo
+   siguiente lo ignoraría.
+2. **Modbus Getter:** al recibir el mensaje, lee 8 holding registers del Unit 2 (MTR-02) con la
+   función 03, y deja los 8 números en `msg.payload`.
+3. **function:** código JavaScript que decodifica los registros y arma el JSON del mensaje.
+4. **mqtt out:** publica ese JSON en el tópico de MTR-02, con QoS 1.
+
+**Lo que aparece:**
+- **Nodo:** un bloque que hace una sola cosa.
+- **`msg` y `msg.payload`:** el objeto que viaja por los cables y su contenido principal.
+- **Nodos de configuración:** el cliente Modbus (`simulador:5020`) y el broker (`mosquitto:1883`). No se
+  dibujan en el lienzo, pero los nodos los usan para conectarse.
+- **Desplegar (deploy):** activar el flujo en el servidor de Node-RED.
+
 ```js
 // Nodo function (flows/funcion-decodificar.js): recibe msg y devuelve el msg que sigue
 const r = msg.payload;                                  // los 8 registros
@@ -969,6 +1255,15 @@ flowchart LR
   GWC --- VG[("Volumen<br/>datos-gateway")]
   MY["Contenedor mysql<br/>(imagen oficial)"] --- VM[("Volumen<br/>datos-mysql")]
 ```
+
+**Cómo leer este diagrama.** Se lee de izquierda a derecha: de la receta al programa corriendo. La línea
+sin punta de flecha une un contenedor con su volumen.
+1. El **Dockerfile** es la receta: qué sistema base usar, qué copiar y qué comando ejecutar.
+2. `docker build` sigue la receta y produce una **imagen**, una plantilla de solo lectura.
+3. De una misma imagen salen **tres contenedores**: la API, el gateway y el simulador. Solo cambia el
+   comando con que arranca cada uno.
+4. Los **volúmenes** guardan lo que debe sobrevivir a un contenedor: el buffer del gateway y los datos de MySQL.
+5. MySQL usa una **imagen oficial** ya hecha (`mysql:8.4`), así que no necesita un Dockerfile propio.
 
 | Concepto | Qué es | En el proyecto |
 |---|---|---|
@@ -1032,6 +1327,21 @@ flowchart LR
   CR["cron 03:00"] -->|"respaldo.sh"| BK[("/var/backups")]
 ```
 
+**Cómo leer este diagrama.** Se lee desde el usuario, a la izquierda, hacia adentro del servidor.
+1. Toda conexión pasa primero por **ufw**, el firewall, que solo deja entrar los puertos web (80 y 443) y el de SSH.
+2. **nginx** recibe la petición y la reenvía a la API, que solo escucha en `127.0.0.1:3000`. No se puede
+   llegar a la API sin pasar por nginx.
+3. La API y el gateway son dos **servicios de systemd**: si caen, systemd los levanta de nuevo.
+4. MySQL y Mosquitto siguen corriendo en **Docker**.
+5. Cada día a las 03:00, **cron** ejecuta `respaldo.sh`, que deja una copia comprimida de la base en `/var/backups`.
+
+**Lo que aparece:**
+- **Firewall:** el filtro que decide qué conexiones pueden entrar al servidor.
+- **Proxy inverso:** un servidor que recibe en nombre de otro y le reenvía. Centraliza TLS, límites y logs.
+- **`127.0.0.1`:** la dirección "este mismo equipo". Lo que escucha ahí no es visible desde la red.
+- **Servicio de systemd:** un programa que Linux arranca, supervisa y reinicia solo.
+- **cron:** el programador de tareas de Linux.
+
 | Pieza | Qué hace | Archivo |
 |---|---|---|
 | systemd | Arranca, reinicia (a los 5 s) y encierra el servicio | `deploy/telemetria-api.service` |
@@ -1082,6 +1392,21 @@ gitGraph
   merge fase-02-mysql tag: "fase-02"
   commit id: "feat(api): base de Express" tag: "fase-03"
 ```
+
+**Cómo leer este diagrama.** Cada punto es un **commit**, y el tiempo avanza de izquierda a derecha. La
+línea principal es `main`; la que se separa es una **rama** de trabajo (`fase-02-mysql`). Donde
+vuelven a juntarse hay un **merge**, y las etiquetas son **tags** que marcan versiones.
+1. En `main` quedan el plan y el esqueleto, con el tag `fase-01`.
+2. Se abre la rama `fase-02-mysql` y se trabaja ahí sin tocar `main`.
+3. Se revisa en GitHub con un **PR** (pull request) y se integra con un merge, que recibe el tag `fase-02`.
+4. Se sigue con la fase siguiente.
+
+**Lo que aparece:**
+- **Commit:** una foto del código, con autor, fecha y mensaje.
+- **Rama:** una línea de trabajo paralela.
+- **Merge:** traer los commits de una rama a otra.
+- **PR (pull request):** la solicitud de revisión antes del merge.
+- **Tag:** un nombre fijo para un commit, como `v1.0.0`.
 
 | Tipo de commit (Conventional Commits) | Para qué |
 |---|---|
@@ -1208,6 +1533,25 @@ erDiagram
   }
 ```
 
+**Cómo leer este diagrama.** Cada caja es una **tabla**, con sus columnas: tipo, nombre y una marca.
+Las líneas entre cajas son **relaciones**, y sus extremos dicen cuántos:
+- `||` (dos rayas): exactamente uno.
+- `o{` (círculo y pata de gallo): cero o muchos.
+
+Así, `SITIOS ||--o{ MOTORES` se lee: "cada motor pertenece a exactamente un sitio, y un sitio tiene
+cero o muchos motores".
+
+**Las marcas de las columnas:**
+- **PK (clave primaria):** identifica cada fila y no se repite. Si una tabla tiene varias PK, la clave
+  es la **combinación**: en `LECTURAS`, el motor, la variable y la hora juntos.
+- **FK (clave foránea):** apunta a la PK de otra tabla, y la base impide que apunte a algo que no existe.
+- **UK (clave única):** no se repite, pero no es la PK (por ejemplo, el código `MTR-01`).
+- El texto entre comillas es una nota.
+
+**"Sin FK"** significa que la relación existe en los datos, pero la base no la obliga. Con millones de
+filas, revisarla en cada INSERT costaría demasiado, y las tablas particionadas no admiten FK. La API
+valida esa relación con su catálogo.
+
 | Tabla | Para qué existe | Detalle clave |
 |---|---|---|
 | `sitios`, `motores`, `variables` | El catálogo: qué existe y su rango válido | La API lo guarda en memoria (caché de 60 s) |
@@ -1239,6 +1583,18 @@ flowchart TD
   H --> I["MySQL: usuario sin DELETE;<br/>auditoría de solo inserción"]
 ```
 
+**Cómo leer este diagrama.** Va de afuera (arriba) hacia adentro (abajo). Cada caja es una barrera que
+tiene que cruzar quien quiera llegar a los datos. Es la **defensa en profundidad**: si una capa falla,
+la siguiente sigue protegiendo.
+1. **ufw:** el firewall del servidor; cierra todos los puertos salvo SSH, 80 y 443.
+2. **nginx:** la única puerta de entrada; no anuncia su versión ni guarda el token del WebSocket en sus logs.
+3. **helmet y CSP:** encabezados que le ordenan al navegador, por ejemplo, ejecutar solo los scripts del propio sitio.
+4. **Límite de logins:** frena a quien prueba claves al azar (fuerza bruta).
+5. **JWT:** prueba quién eres en cada petición.
+6. **Rol:** decide qué acciones puedes hacer.
+7. **Sitio dentro del SQL:** decide sobre qué datos (evita BOLA).
+8. **Permisos de MySQL:** aunque roben la clave de la API, con ella no se puede borrar ni alterar la auditoría.
+
 | Amenaza | Defensa | Dónde |
 |---|---|---|
 | Inyección SQL | Parámetros `?`; nunca concatenar valores | Todo el SQL de `src/api/` |
@@ -1267,6 +1623,15 @@ flowchart LR
   A -->|"MySQL caída:<br/>el loteador reintenta"| D[("MySQL")]
   B -.->|"mensaje repetido:<br/>la PK lo absorbe"| D
 ```
+
+**Cómo leer este diagrama.** Es el camino de un dato, de izquierda a derecha. El texto de cada flecha
+dice qué falla puede ocurrir en ese tramo y qué la cubre. La flecha punteada muestra el efecto
+secundario de reenviar: pueden llegar duplicados, y la base los absorbe.
+- **Buffer SQLite (store-and-forward):** si se corta el enlace, el gateway guarda y reenvía después.
+- **Sesión persistente:** si la API no está, el broker le guarda los mensajes.
+- **Reintento del loteador:** si MySQL no responde, las filas esperan en memoria y se escriben en orden al volver.
+- **PK idempotente:** cada protección puede reenviar, así que un mensaje puede llegar dos veces. La PK
+  impide guardarlo dos veces.
 
 | Si falla... | Qué pasa | Quién lo cubre | ¿Probado? |
 |---|---|---|---|
@@ -1310,6 +1675,23 @@ Particiones por mes: un archivo por mes
  "borrar octubre"        → DROP PARTITION p2026_10 (suelta el archivo entero)
 ```
 
+**Cómo leer este dibujo.** Muestra las dos técnicas de la tabla que más se notan:
+- **Arriba, el índice `(calidad, ts)`.** Un índice es una lista aparte y ordenada que apunta a cada
+  fila, como el índice alfabético de un libro. Este ordena primero por calidad y después por hora, así
+  que las lecturas fuera de rango (calidad 1) quedan juntas y en orden. Para "las últimas 50", MySQL
+  entra por el final de ese grupo, lee 50 filas y se detiene, sin tocar los 2,4 millones de lecturas buenas.
+- **Abajo, las particiones.** La tabla se divide en un archivo por mes. Una consulta de noviembre abre
+  solo ese archivo: eso es la **poda** (*partition pruning*). Borrar octubre es soltar su archivo
+  completo, en vez de borrar fila por fila como hace un `DELETE`.
+
+**Las otras dos mejoras de la tabla:**
+- **`lecturas_hora`:** un `EVENT` de MySQL (una tarea programada dentro de la base) guarda cada hora
+  el promedio, el mínimo y el máximo de cada motor y variable. Un promedio de 7 días lee 168 filas por
+  motor y variable, en vez de 60.480 (una cada 10 s).
+- **Paginación por clave:** con `OFFSET`, la página 4000 obliga a recorrer 200.000 filas para entregar
+  50. Con la clave se pide "las 50 anteriores al último id que viste": MySQL entra directo por la PK y
+  lee solo esas 50.
+
 **La regla:** primero se mide (slow query log y `EXPLAIN ANALYZE`) y después se corrige. Más detalle
 en [rendimiento.md](rendimiento.md).
 
@@ -1346,6 +1728,20 @@ stateDiagram-v2
     resumen retenido en MQTT
   end note
 ```
+
+**Cómo leer este diagrama.** Las cajas son los **estados** de cada motor, y las flechas, los **cambios
+de estado** con su condición. El punto negro marca el inicio.
+1. Todo motor parte en **ConDatos**.
+2. Si pasan 5 minutos sin una lectura nueva, cambia a **EnSilencio**. En ese cambio, y solo ahí, se
+   escribe el log, se manda la alerta al dashboard y se publica el resumen retenido en MQTT (la nota).
+3. Cuando vuelve a enviar datos, regresa a **ConDatos** y se avisa `motor_recuperado`.
+
+**Por qué se avisa solo en el cambio:** un motor callado durante una hora generaría 60 alertas iguales
+si se avisara en cada revisión, y la gente aprendería a ignorarlas.
+
+**Lo que aparece:**
+- **Mensaje retenido:** el broker guarda el último resumen de cada sitio y se lo entrega al instante a
+  quien se suscriba después (por ejemplo, un EMS).
 
 Cuando algo falla: [RUNBOOK.md](RUNBOOK.md) tiene los cuatro procedimientos (un sitio sin datos, la
 API caída, la base lenta y restaurar un respaldo).
