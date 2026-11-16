@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "Plataforma de telemetría de motores: Modbus, CAN, MQTT, API Node.js, MySQL y tiempo real",
   "scripts": {
-    "test": "node --env-file=.env.test --test",
+    "test": "node --env-file=.env.test --test \"test/*.test.js\"",
     "api": "node --env-file=.env src/api/server.js",
-    "api:dev": "node --env-file=.env --watch src/api/server.js"
+    "api:dev": "node --env-file=.env --watch src/api/server.js",
+    "sembrar": "node --env-file=.env src/scripts/sembrar-usuarios.js"
   },
   "repository": {
     "type": "git",
@@ -22,7 +23,11 @@
   },
   "private": true,
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "express": "^5.3.0",
+    "express-rate-limit": "^8.7.4",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.24.6",
     "zod": "^4.6.7"
   },

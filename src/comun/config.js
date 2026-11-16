@@ -19,6 +19,9 @@ const esquema = z.object({
   // SEGURIDAD: sin valor por defecto. Una clave nunca vive en el código.
   DB_CLAVE: z.string({ error: 'es obligatoria' }).min(1, 'es obligatoria'),
   DB_NOMBRE: z.string().default('telemetria'),
+  // SEGURIDAD: con HS256, quien conoce el secreto puede fabricar tokens válidos. 32 caracteres o
+  // más (256 bits en hexadecimal) hacen inviable adivinarlo por fuerza bruta.
+  JWT_SECRETO: z.string({ error: 'es obligatorio' }).min(32, 'debe tener 32 caracteres o más'),
 });
 
 const resultado = esquema.safeParse(process.env);
@@ -38,5 +41,9 @@ export const config = Object.freeze({
     usuario: env.DB_USUARIO,
     clave: env.DB_CLAVE,
     nombre: env.DB_NOMBRE,
+  }),
+  jwt: Object.freeze({
+    secreto: env.JWT_SECRETO,
+    duracionSeg: 15 * 60, // 15 min en s: si roban un token, sirve poco tiempo
   }),
 });

@@ -28,6 +28,7 @@ docker compose up -d --wait       # MySQL 8.4; la primera vez crea la base con s
 API y pruebas:
 
 ```bash
+npm run sembrar                                     # usuarios admin, ing-norte, lector-sur, gw-norte
 npm run api:dev                                     # http://localhost:3000/api/salud
 bash src/scripts/preparar-db-test.sh && npm test    # recrea telemetria_test y corre las pruebas
 ```
@@ -40,4 +41,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 3 · API base con Express.
+Fase 4 · Seguridad: login, roles, permiso por sitio y auditoría.

@@ -1,12 +1,17 @@
 /**
  * app.js · arma la aplicación Express: la cadena de middlewares y rutas (Fase 3).
  * crearApp() no abre ningún puerto: server.js la pone a escuchar y las pruebas la usan con
- * supertest, sin red. Las fases siguientes agregan seguridad (4), lecturas (5) y tiempo real (9).
+ * supertest, sin red. La Fase 4 suma helmet, auditoría, login y consulta de auditoría; las
+ * siguientes, lecturas (5) y tiempo real (9).
  */
 import express from 'express';
+import helmet from 'helmet';
 import { pool } from './db.js';
 import { ErrorHttp } from '../comun/errores.js';
+import { registrarAcceso } from './auditoria.js';
+import { rutasAuth } from './rutas/auth.js';
 import { rutasMotores } from './rutas/motores.js';
+import { rutasAuditoria } from './rutas/auditoria.js';
 
 /**
  * Crea una instancia nueva de la aplicación.
@@ -17,6 +22,15 @@ export function crearApp() {
 
   // CONCEPTO: middleware. Una función (req, res, next) por la que pasa cada petición, en el orden
   // en que se registra: como los filtros de Spring Security en FlowSense. El orden importa.
+
+  // helmet(): encabezados de seguridad en cada respuesta. Entre otros: X-Content-Type-Options
+  // (el navegador no adivina tipos), Content-Security-Policy (solo scripts propios), quita
+  // X-Powered-By (no anuncia "Express") y Strict-Transport-Security (fuerza HTTPS con TLS).
+  app.use(helmet());
+
+  // Auditoría antes del parser y de las rutas: así también quedan anotados un JSON roto (400) o
+  // una ruta inexistente (404).
+  app.use(registrarAcceso);
 
   // Convierte el cuerpo JSON en req.body. limit: un cuerpo de más de 1 MB responde 413.
   app.use(express.json({ limit: '1mb' }));
@@ -33,7 +47,9 @@ export function crearApp() {
     }
   });
 
+  app.use('/api/auth', rutasAuth());
   app.use('/api/motores', rutasMotores());
+  app.use('/api/auditoria', rutasAuditoria());
 
   // Ninguna ruta respondió: 404 en JSON, igual que el resto de la API (Express respondería en HTML).
   app.use((req, res) => {
