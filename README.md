@@ -14,6 +14,7 @@ Node-RED (Modbus en bloques) ─────────────────
              agregados, particiones)                                  y MQTT de solo lectura ──> SCADA / EMS
 ```
 
+- **Para entender todo el proyecto desde cero:** [docs/GUIA.md](docs/GUIA.md): arquitectura, herramientas con su sintaxis, diagramas y ruta de estudio.
 - **Plan** fase por fase: [PLAN.md](PLAN.md) · **avance:** [PROGRESO.md](PROGRESO.md) · **apuntes de estudio:** [docs/apuntes/](docs/apuntes/)
 - **Decisiones de diseño:** [docs/decisiones.md](docs/decisiones.md) · **rendimiento medido:** [docs/rendimiento.md](docs/rendimiento.md) · **runbook:** [docs/RUNBOOK.md](docs/RUNBOOK.md)
 - **Tópicos MQTT:** [docs/topicos.md](docs/topicos.md) · **J1939:** [docs/j1939.md](docs/j1939.md) · **RS485:** [docs/rs485.md](docs/rs485.md)
