@@ -3,11 +3,7 @@
 ## Antes de empezar
 
 1. Termina la Fase 0 de `PLAN.md`.
-2. Haz el paso 1 de la Fase 1: crea la carpeta del proyecto y copia ahí los cuatro archivos.
-   ```bash
-   mkdir -p ~/proyectos/telemetria-motores && cd ~/proyectos/telemetria-motores
-   cp /mnt/c/Users/<tu-usuario>/Downloads/{PLAN,AGENTS,CLAUDE,PROMPTS}.md .
-   ```
+2. La carpeta del proyecto ya existe con los cuatro archivos: `F:\1. Proyectos personales\Developer Apis\Detroit` (repositorio `Huamagod1/Proyecto_backend`).
    `AGENTS.md` tiene las reglas. Codex lo lee al iniciar, y `CLAUDE.md` lo importa para Claude Code.
 3. Abre el agente en esa carpeta:
    - **Codex:** `codex`. Lee `AGENTS.md` al arrancar; si cambias el archivo, reinícialo.

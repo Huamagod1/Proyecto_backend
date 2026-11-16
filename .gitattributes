@@ -1,0 +1,15 @@
+# .gitattributes · cómo trata Git los saltos de línea y los binarios (fases 0 y 1).
+# POR QUÉ: trabajas en Windows, pero los .sh, .sql y .conf los leen contenedores Linux, que fallan
+# con CRLF ($'\r': command not found). Este archivo viaja con el repositorio y le gana al
+# core.autocrlf=true de Git para Windows.
+# OJO: en este archivo los comentarios van en su propia línea; un # al final de una regla se lee
+# como un atributo más.
+
+# Todo lo que Git detecte como texto se guarda y se saca con LF, en cualquier sistema.
+* text=auto eol=lf
+
+# Binarios: sin conversión de saltos de línea y sin diff de texto.
+*.png binary
+*.jpg binary
+*.ico binary
+*.sqlite binary

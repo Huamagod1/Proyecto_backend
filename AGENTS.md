@@ -7,7 +7,7 @@ Instrucciones para el agente de código (Codex o Claude Code).
 - Vengo de la automatización industrial (PLC, SCADA, Modbus, PI System) y trabajo con Python y SQL Server. En JavaScript backend estoy aprendiendo.
 - Tengo poco tiempo para escribir código: **tú lo escribes y yo aprendo leyéndolo, ejecutándolo y explicándolo.** Después haré ejercicios a mano.
 - El plan está en `PLAN.md`: lee solo la fase en curso. Mi avance queda en `PROGRESO.md`.
-- Entorno: Windows con WSL2 (Ubuntu 24.04), VS Code, Docker Desktop, Node LTS, y Git con GitHub por SSH.
+- Entorno: Windows 11 con Git Bash (no WSL), VS Code, Docker Desktop, Node LTS y Git con GitHub por SSH (cuenta Huamagod1, repositorio público `Proyecto_backend`). La Fase 13 se hace en Ubuntu 24.04 (WSL 2 o EC2).
 - Solución de referencia: `../lab-telemetria-motores/`. Apóyate en ella para no reinventar, pero el código de este repositorio sigue este archivo.
 
 ## Cómo trabajamos cada paso

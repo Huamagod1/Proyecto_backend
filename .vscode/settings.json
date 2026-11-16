@@ -1,0 +1,7 @@
+// Ajustes de VS Code para este repositorio (Fase 0). VS Code acepta comentarios en este JSON.
+{
+  // POR QUÉ: los archivos nuevos se crean con LF; con CRLF fallan bash y los contenedores Linux.
+  "files.eol": "\n",
+  // La terminal integrada abre Git Bash: los comandos del plan están escritos para bash.
+  "terminal.integrated.defaultProfile.windows": "Git Bash"
+}

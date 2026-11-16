@@ -23,7 +23,9 @@ El agente de código (Codex o Claude Code) escribe la aplicación siguiendo este
 
 Las palabras clave están definidas en `AGENTS.md`: `implementa`, `implementa la fase`, `explica`, `por qué`, `pregúntame`, `ejercicio` y `cierra la fase`. Los prompts para arrancar están en `PROMPTS.md`.
 
-**Solución de referencia:** `../lab-telemetria-motores/`, el laboratorio que ya tienes. El agente puede apoyarse en ella; la tabla del final dice qué archivo corresponde a cada fase.
+**Solución de referencia:** `../lab-telemetria-motores/`, si la consigues. Hoy no está en el equipo, así que el agente construye sin ella; la tabla del final dice qué archivo corresponde a cada fase.
+
+**Tu caso.** El repositorio es `Huamagod1/Proyecto_backend` (público) y vive en `F:\1. Proyectos personales\Developer Apis\Detroit`. Desarrollas en Windows 11 con Git Bash; los servicios corren en contenedores Linux y el despliegue de la Fase 13 se hace en Ubuntu 24.04 (WSL 2 o EC2).
 
 ## Lo que vas a construir
 
@@ -53,7 +55,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 | MySQL y SQLite: modelado, consultas y mantenimiento | 2, 7, 11 |
 | Autenticación, seguridad, roles y trazabilidad de accesos | 4, 6, 14 |
 | Datos en tiempo real: procesar, almacenar y consultar | 6, 7, 9 |
-| Servicios en servidores Linux | 0, 13 |
+| Servicios en servidores Linux | 13 |
 | Git y control de versiones | 1 y todas |
 | Express.js y JSON | 3 a 5 |
 | Node-RED | 10 |
@@ -67,7 +69,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 
 ## Avance
 
-- [ ] Fase 0 · Entorno de trabajo (1–2 h)
+- [ ] Fase 0 · Entorno de trabajo (1 h)
 - [ ] Fase 1 · Git y esqueleto del proyecto (1 h)
 - [ ] Fase 2 · MySQL: modelo de datos y consultas (2–3 h)
 - [ ] Fase 3 · API base con Express (2–3 h)
@@ -88,12 +90,13 @@ El plan completo toma unas 35 horas. **Ruta corta** (unas 22 horas): fases 0 a 7
 ## Estructura final del repositorio
 
 ```
-telemetria-motores/
+Proyecto_backend/     (en tu equipo: F:\1. Proyectos personales\Developer Apis\Detroit)
 ├── AGENTS.md · CLAUDE.md · PLAN.md · PROMPTS.md · PROGRESO.md · README.md
-├── .env.example · .gitignore · .dockerignore · package.json
+├── .env.example · .gitignore · .gitattributes · .dockerignore · package.json
+├── .vscode/          settings.json (saltos de línea LF y Git Bash como terminal)
 ├── docker-compose.yml · Dockerfile
 ├── mosquitto/        mosquitto.conf, acl
-├── sql/              001_esquema.sql, 002_datos_iniciales.sql, 003_usuario_app.sql, consultas.sql, rendimiento.sql
+├── sql/              001_esquema.sql, 002_datos_iniciales.sql, 003_usuario_app.sh (corren al crear la base)
 ├── src/
 │   ├── comun/        config.js, log.js, errores.js, validacion.js, decodificacion.js, j1939.js
 │   ├── api/          app.js, server.js, db.js, auth.js, auditoria.js, catalogo.js, repositorio.js,
@@ -102,7 +105,7 @@ telemetria-motores/
 │   ├── simulador/    motor-modbus.js
 │   └── scripts/      sembrar-usuarios.js, preparar-db-test.sh, can-a-mqtt.js, generar-volumen.js
 ├── public/           index.html, app.js, estilos.css
-├── practica/         lote-ejemplo.json, candump-ejemplo.log
+├── practica/         consultas.sql, rendimiento.sql, lote-ejemplo.json, candump-ejemplo.log
 ├── test/             *.test.js
 ├── flows/            gateway-modbus.json (Node-RED)
 ├── deploy/           servicios systemd, nginx, respaldo.sh, desplegar.sh
@@ -113,66 +116,54 @@ telemetria-motores/
 
 ## Fase 0 · Entorno de trabajo
 
-**Objetivo:** Ubuntu en WSL2 con Node, Docker, Git, VS Code y el agente de código (Codex o Claude Code), listo para todo el proyecto.
-**Tiempo:** 1 a 2 horas.
+**Objetivo:** Windows 11 con Git Bash, Node LTS, Docker Desktop, Git con GitHub por SSH, VS Code y el agente de código (Claude Code o Codex), listo para las fases 1 a 12. El Linux de verdad llega en la Fase 13.
+**Tiempo:** 1 hora.
 
-**La idea.** Es calibrar las herramientas antes de la obra. El servicio final corre en Linux, así que trabajas en Linux desde el primer día: la misma terminal, los mismos permisos y las mismas rutas que en producción.
+**La idea.** Es calibrar las herramientas antes de la obra. Trabajas en Windows, pero con una terminal bash (Git Bash) y con los servicios (MySQL, Mosquitto, Node-RED) en contenedores Linux. El despliegue de la Fase 13 se hace en un Ubuntu real.
 
 **Pasos**
 
-1. En PowerShell como administrador: `wsl --install -d Ubuntu-24.04`. Reinicia y crea tu usuario de Linux.
-2. En Ubuntu, actualiza e instala las utilidades:
+1. Terminal: en VS Code, *Ctrl+Shift+P* → *Terminal: Select Default Profile* → **Git Bash**. Todos los comandos del plan son bash. En PowerShell 5.1, `curl` es un alias de `Invoke-WebRequest`, y las comillas, `$(...)` y `\` no funcionan igual.
+2. Node LTS (la 26), en el canal LTS de winget:
    ```bash
-   sudo apt update && sudo apt upgrade -y
-   sudo apt install -y build-essential git curl jq unzip mysql-client mosquitto-clients
+   winget install -e --id OpenJS.NodeJS.LTS
    ```
-3. Comprueba que WSL usa systemd (lo necesitas en la Fase 13): `ps -p 1 -o comm=` debe decir `systemd`. Si no, agrega esto a `/etc/wsl.conf`:
-   ```ini
-   [boot]
-   systemd=true
-   ```
-   Luego ejecuta `wsl --shutdown` en PowerShell y vuelve a abrir Ubuntu.
-4. Node con nvm, que no necesita sudo y permite cambiar de versión:
+   Reemplaza la versión anterior; si winget avisa un conflicto, primero `winget uninstall -e --id OpenJS.NodeJS`. Cierra y abre la terminal.
+3. Utilidades: `winget install -e --id jqlang.jq`. curl y openssl ya vienen con Git Bash. Los clientes `mysql`, `mosquitto_pub` y `mosquitto_sub` se usan dentro de sus contenedores (`docker compose exec ...`), así que no instalas nada más.
+4. Evita que Git Bash reescriba las rutas de Linux al llamar a programas de Windows como `docker`:
    ```bash
-   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-   source ~/.bashrc
-   nvm install --lts
+   echo 'export MSYS_NO_PATHCONV=1' >> ~/.bashrc && source ~/.bashrc
    ```
-5. Docker Desktop en Windows → *Settings* → *Resources* → *WSL integration* → activa Ubuntu-24.04.
-6. VS Code: instala la extensión **WSL** de Microsoft. Desde Ubuntu, `code .` abre la carpeta conectada a Linux; abajo a la izquierda debe decir *WSL: Ubuntu-24.04*.
-7. Git y GitHub por SSH:
+   Sin esto, `/mosquitto/config/passwd` le llega a docker como `C:/Program Files/Git/mosquitto/config/passwd`.
+5. Docker Desktop: ábrelo y espera *Engine running*. Usa el motor WSL 2 (*Settings* → *General*); la integración con las distros de WSL recién hace falta en la Fase 13.
+6. VS Code: el repositorio trae `.vscode/settings.json`, con saltos de línea LF y Git Bash como terminal. Abre la carpeta con `code .`.
+7. GitHub por SSH, con la cuenta dueña del repositorio (Huamagod1):
    ```bash
-   git config --global user.name "Tu Nombre"
-   git config --global user.email "tu-correo@ejemplo.com"
-   git config --global init.defaultBranch main
-   ssh-keygen -t ed25519 -C "tu-correo@ejemplo.com"
-   cat ~/.ssh/id_ed25519.pub   # pégala en GitHub → Settings → SSH and GPG keys
-   ssh -T git@github.com       # debe saludarte con tu usuario
+   cat ~/.ssh/id_ed25519.pub   # pégala en GitHub → Settings → SSH and GPG keys → New SSH key
+   ssh -T git@github.com       # debe decir: Hi Huamagod1!
    ```
-8. El agente, dentro de Ubuntu:
-   - Codex: `npm install -g @openai/codex`, y después `codex --version`;
-   - o Claude Code: `curl -fsSL https://claude.ai/install.sh | bash`, y después `claude --version`.
-9. Trabaja **dentro de Linux**, no en `/mnt/c`, porque es mucho más rápido.
-   - Crea la carpeta: `mkdir -p ~/proyectos`.
-   - Descomprime ahí el laboratorio de referencia, de modo que quede `~/proyectos/lab-telemetria-motores/`.
-   - Desde Ubuntu, tus descargas de Windows están en `/mnt/c/Users/<tu-usuario>/Downloads/`.
+   Si no tienes llave, créala con `ssh-keygen -t ed25519`. OJO: tu `gh` tiene la sesión de otra cuenta (FernandoH98), así que `gh ssh-key add` agregaría la llave allá.
+8. El agente: Claude Code ya está instalado (`claude --version`). Codex es opcional: `npm install -g @openai/codex`.
+9. La carpeta del proyecto es `F:\1. Proyectos personales\Developer Apis\Detroit` (en Git Bash, `/f/1. Proyectos personales/Developer Apis/Detroit`). Tiene espacios: escríbela siempre entre comillas.
 
 **Verifica**
 
 | Comando | Esperado |
 |---|---|
-| `node -v` | v22.13 o superior (idealmente la LTS más reciente) |
+| `uname -s` | `MINGW64_NT-...` (estás en Git Bash) |
+| `node -v` | v26.x (mínimo v22.13) |
+| `jq --version` | `jq-1.x` |
 | `docker run --rm hello-world` | `Hello from Docker!` |
 | `docker compose version` | `Docker Compose version v2...` |
-| `ps -p 1 -o comm=` | `systemd` |
-| `ssh -T git@github.com` | `Hi <tu-usuario>!` |
-| `codex --version` o `claude --version` | un número de versión |
+| `echo $MSYS_NO_PATHCONV` | `1` |
+| `ssh -T git@github.com` | `Hi Huamagod1!` |
+| `claude --version` o `codex --version` | un número de versión |
 
 **La dominas si…**
-- [ ] Sabes por qué trabajas en `~/` y no en `/mnt/c`.
-- [ ] Puedes explicar qué es WSL2 y qué hace systemd.
+- [ ] Sabes qué corre en Windows (Node, Git y tu código) y qué corre en Linux (los contenedores y, en la Fase 13, el servicio).
+- [ ] Explicas los tres roces entre Windows y Linux: los saltos de línea (CRLF y LF), las rutas y las señales (`SIGTERM`).
 
-**Pregunta de entrevista.** *"¿Por qué desarrollas en Linux si tu equipo es Windows?"* Porque el servicio corre en Linux. Desarrollar en el mismo sistema evita sorpresas con rutas, permisos y saltos de línea, y me obliga a usar la terminal, systemd y los logs como en producción.
+**Pregunta de entrevista.** *"¿Por qué desarrollas en Windows si el servicio corre en Linux?"* Porque el código Node es multiplataforma y las dependencias corren en contenedores Linux, iguales a producción. Los roces los controlo: los saltos de línea con `.gitattributes`, las rutas con `node:path` y las señales probando el apagado en Docker y systemd. Antes de producción lo despliego en un Ubuntu real.
 
 ---
 
@@ -185,11 +176,7 @@ telemetria-motores/
 
 **Pasos**
 
-1. Crea el proyecto y copia dentro `PLAN.md`, `AGENTS.md`, `CLAUDE.md` y `PROMPTS.md`:
-   ```bash
-   mkdir -p ~/proyectos/telemetria-motores && cd ~/proyectos/telemetria-motores
-   git init
-   ```
+1. Ya está hecho: la carpeta `Detroit` con `PLAN.md`, `AGENTS.md`, `CLAUDE.md` y `PROMPTS.md`, el repositorio local (`git init -b main`), el primer commit y el remoto `origin` → `git@github.com:Huamagod1/Proyecto_backend.git`.
 2. Inicializa Node como ES modules, con un script de pruebas:
    ```bash
    npm init -y
@@ -198,7 +185,7 @@ telemetria-motores/
    npm pkg set scripts.test="node --test"
    ```
 3. Crea las carpetas: `mkdir -p src/{comun,api/rutas,gateway,simulador,scripts} sql test public practica deploy docs flows mosquitto`.
-4. Escribe `.gitignore` con `node_modules/`, `.env`, `.env.*`, `!.env.example`, `*.sqlite` y `datos/`.
+4. Escribe `.gitignore` con `node_modules/`, `.env`, `.env.*`, `!.env.example`, `*.sqlite`, `datos/` y `mosquitto/passwd`: tu repositorio es público y ese archivo guarda los hashes de las claves del broker. `.gitattributes` (`* text=auto eol=lf`) ya existe: fija los saltos de línea en LF aunque trabajes en Windows.
 5. Escribe `.env.example`, con las variables que irás usando y sin claves reales:
    ```ini
    PUERTO=3000
@@ -213,12 +200,12 @@ telemetria-motores/
    ```
    Cópialo a `.env` (`cp .env.example .env`) y pon tus valores.
 6. Escribe un `README.md` corto: qué es, cómo levantarlo (lo completarás en cada fase) y en qué fase vas.
-7. Crea en GitHub un repositorio **privado** llamado `telemetria-motores`, sin README, y conéctalo:
+7. El repositorio ya existe en GitHub: `Huamagod1/Proyecto_backend`, **público**. Sirve de portafolio, pero cualquiera puede leer lo que subas: por eso `.env` nunca se sube y las claves de laboratorio salen de `.env` (fases 2 y 6). Sube el esqueleto:
    ```bash
    git add . && git commit -m "chore: esqueleto del proyecto"
-   git remote add origin git@github.com:<tu-usuario>/telemetria-motores.git
    git push -u origin main
    ```
+   Para abrir PR con `gh`, inicia sesión también con Huamagod1 (`gh auth login`) y cambia de cuenta con `gh auth switch`.
 8. Este es el flujo que repetirás en cada fase:
    ```bash
    git switch -c fase-02-mysql        # una rama por fase
@@ -247,15 +234,15 @@ telemetria-motores/
 
 **La idea.** La tabla `lecturas` es un historiador, como el PI System que conoces. Guarda una fila por motor, variable e instante, en el mismo orden en que se consulta (motor → variable → tiempo), para leer rangos de tiempo muy rápido.
 
-**Construyes:** `docker-compose.yml` (solo MySQL por ahora), `sql/001_esquema.sql`, `sql/002_datos_iniciales.sql`, `sql/003_usuario_app.sql` y `sql/consultas.sql`.
+**Construyes:** `docker-compose.yml` (solo MySQL por ahora), `sql/001_esquema.sql`, `sql/002_datos_iniciales.sql`, `sql/003_usuario_app.sh` y `practica/consultas.sql`.
 
 **Pasos**
 
 1. Escribe `docker-compose.yml` con un servicio `mysql`:
-   - imagen `mysql:8.4`, con `MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}` (Compose la lee de tu `.env`) y `MYSQL_DATABASE: telemetria`;
+   - imagen `mysql:8.4`, con `MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}` (Compose la lee de tu `.env`), `MYSQL_DATABASE: telemetria` y `DB_CLAVE: ${DB_CLAVE}`, que usa el script del paso 4;
    - zona horaria UTC: `TZ: UTC` y `command: ["--default-time-zone=+00:00"]`;
    - el puerto `3306:3306` y un volumen con nombre para los datos;
-   - `./sql` montado en `/docker-entrypoint-initdb.d`. MySQL ejecuta esos archivos en orden alfabético, **solo** al crear la base;
+   - `./sql` montado en `/docker-entrypoint-initdb.d`. MySQL ejecuta esos archivos en orden alfabético, **solo** al crear la base. Por eso las consultas de práctica van en `practica/` y no en `sql/`;
    - un `healthcheck` con `mysqladmin ping` (en Compose, `$$MYSQL_ROOT_PASSWORD` lleva doble `$`).
 2. Escribe `001_esquema.sql`, con todas las tablas en InnoDB y las fechas en `DATETIME(3)` y UTC:
 
@@ -273,14 +260,14 @@ telemetria-motores/
    - los sitios `norte` y `sur`;
    - los motores `MTR-01` y `MTR-02` en norte, y `MTR-03` en sur;
    - las variables, con unidad y rango: `rpm` (0–3000), `temp_refrigerante` (−40–150 °C), `presion_aceite` (0–1000 kPa), `voltaje_bateria` (0–36 V), `carga` (0–110 %), `horas_motor` (0–200000 h) y `alarmas` (0–65535).
-4. Escribe `003_usuario_app.sql`: el usuario `telemetria_app`, con **solo** lo que necesita la API.
+4. Escribe `003_usuario_app.sh`, que crea el usuario `telemetria_app` con **solo** lo que necesita la API.
    - `SELECT` en sitios y variables.
    - `SELECT, INSERT, UPDATE` en motores, usuarios, lecturas y estado_actual. El `UPDATE` lo exige `INSERT ... ON DUPLICATE KEY UPDATE`.
    - `SELECT, INSERT` en auditoria_accesos: la auditoría nunca se modifica ni se borra.
 
-   La clave queda escrita aquí porque es de laboratorio; repítela en `DB_CLAVE` de tu `.env`. En producción, el usuario se crea al desplegar y su clave vive fuera del repositorio.
-5. Levanta la base con `docker compose up -d` y espera a que `docker compose ps` diga *healthy*. Conéctate con `mysql -h 127.0.0.1 -u telemetria_app -p telemetria`.
-6. Inserta a mano unas 10 lecturas de MTR-01 de los últimos 10 minutos. Después escribe estas cinco consultas en `consultas.sql`:
+   La clave sale de `DB_CLAVE` de tu `.env`: Compose se la pasa al contenedor, y MySQL también ejecuta los `.sh` de `/docker-entrypoint-initdb.d`. Así la clave no queda escrita en tu repositorio público.
+5. Levanta la base con `docker compose up -d` y espera a que `docker compose ps` diga *healthy*. Conéctate con el cliente del contenedor: `docker compose exec mysql mysql -u telemetria_app -p telemetria`. También sirve el de tu MySQL 9.3, si agregas `C:\Program Files\MySQL\MySQL Server 9.3\bin` al PATH.
+6. Inserta a mano unas 10 lecturas de MTR-01 de los últimos 10 minutos. Después escribe estas cinco consultas en `practica/consultas.sql`:
    1. el último valor de cada variable de MTR-01, desde `estado_actual`, con el nombre y la unidad de la variable;
    2. las rpm de MTR-01 en la última hora;
    3. el promedio de rpm por minuto en la última hora;
@@ -335,7 +322,7 @@ telemetria-motores/
      - un `ErrorHttp` responde con su estado;
      - el JSON mal formado responde 400;
      - cualquier otro error responde 500 sin detalles internos, y el error completo va al log.
-7. `server.js`: arranca en `PUERTO` y hace un apagado ordenado con `SIGINT` y `SIGTERM`: deja de aceptar conexiones y después cierra el pool.
+7. `server.js`: arranca en `PUERTO` y hace un apagado ordenado con `SIGINT` y `SIGTERM`: deja de aceptar conexiones y después cierra el pool. En Windows lo pruebas con Ctrl+C (`SIGINT`): `SIGTERM` entre procesos no existe en Windows, así que lo pruebas en Docker (Fase 12) y en systemd (Fase 13).
 8. `rutas/motores.js`, siempre con SQL parametrizado (`?`):
 
    | Método y ruta | Hace | Respuestas |
@@ -519,17 +506,17 @@ En MySQL: `SELECT usuario, metodo, recurso, estado_http FROM auditoria_accesos O
 
 **Pasos**
 
-1. Agrega `mosquitto` a Compose: `eclipse-mosquitto:2`, el puerto 1883 y tu `mosquitto.conf` montado.
+1. Agrega `mosquitto` a Compose: `eclipse-mosquitto:2.1` (la versión vigente, fija hasta el minor), el puerto 1883 y tu `mosquitto.conf` montado.
    - Mosquitto 2 exige declarar `listener 1883`.
    - Por ahora usa `allow_anonymous true`, y activa `persistence true`.
 2. Diseña los tópicos en `docs/topicos.md`:
    - `motores/{sitio}/{motor}/telemetria`: las lecturas, con QoS 1;
    - `motores/{sitio}/gateways/{id}/estado`: `online` u `offline`, retenido; es el Last Will del gateway;
    - el mensaje: `{ "motor": "MTR-01", "gateway": "gw-norte", "ts": "<ISO en UTC>", "lecturas": { "rpm": 1500, "temp_refrigerante": 85.2 } }`.
-3. Prueba el broker a mano, en dos terminales:
+3. Prueba el broker a mano, en dos terminales. Los clientes vienen dentro de la imagen de Mosquitto:
    ```bash
-   mosquitto_sub -h 127.0.0.1 -t 'motores/#' -v
-   mosquitto_pub -h 127.0.0.1 -q 1 -t motores/norte/MTR-01/telemetria \
+   docker compose exec mosquitto mosquitto_sub -t 'motores/#' -v
+   docker compose exec mosquitto mosquitto_pub -q 1 -t motores/norte/MTR-01/telemetria \
      -m "{\"motor\":\"MTR-01\",\"gateway\":\"manual\",\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"lecturas\":{\"rpm\":1500}}"
    ```
 4. `npm install mqtt`.
@@ -551,8 +538,9 @@ En MySQL: `SELECT usuario, metodo, recurso, estado_http FROM auditoria_accesos O
 8. **Prueba de resiliencia:** detén la API, publica 20 mensajes con QoS 1 y vuelve a levantarla. Deben llegar los 20, porque el broker los guardó para la sesión persistente.
 9. **Seguridad del broker** (recomendado):
    - cambia a `allow_anonymous false`;
-   - crea las credenciales `api` y `gw-norte` con `mosquitto_passwd`, desde un contenedor de un solo uso que monte `./mosquitto`;
+   - crea las credenciales `api` y `gw-norte` con `mosquitto_passwd`, en un contenedor de un solo uso: `docker compose run --rm --entrypoint mosquitto_passwd mosquitto ...`;
    - en un archivo `acl`, deja que `gw-norte` escriba solo en `motores/norte/#` y que `api` solo lea `motores/#`;
+   - carga los dos archivos con los plugins `mosquitto_password_file` y `mosquitto_acl_file` (`plugin` y `plugin_opt_...`). En Mosquitto 2.1, las opciones `password_file` y `acl_file` siguen funcionando, pero están obsoletas y desaparecen en la 3.0;
    - agrega `MQTT_USUARIO` y `MQTT_CLAVE` a tu `.env`;
    - verifica que `gw-norte` **no** puede publicar en `motores/sur/...`.
 
@@ -622,7 +610,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
    - en el apagado ordenado, publica `offline` a mano, porque una desconexión limpia no dispara el Last Will.
 6. Agrega los scripts:
    - `"simulador": "node --env-file=.env src/simulador/motor-modbus.js"`;
-   - `"gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js"`.
+   - `"gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js"`. El flag calla el aviso de `node:sqlite` en Node 24.4 y anteriores; en las versiones recientes de la 24 y en la 26 ya no aparece.
 7. **Prueba de corte:** con todo andando, detén el broker 60 segundos (`docker compose stop mosquitto`) y vuelve a levantarlo. El gateway acumula y después drena. Cuenta las lecturas por minuto en MySQL: no debe faltar ninguno.
 8. `docs/rs485.md`: en cinco líneas, qué cambiaría con Modbus RTU sobre un RS485 real:
    - el puerto serie (`connectRTUBuffered('/dev/ttyUSB0', { baudRate: 9600 })`);
@@ -630,7 +618,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
    - la terminación de 120 Ω y la polaridad A/B;
    - un solo maestro, y direcciones de 1 a 247.
 
-**Verifica:** con `npm run simulador` y `npm run gateway` andando, `mosquitto_sub -t 'motores/#' -v` muestra mensajes cada pocos segundos y el estado `online` retenido. Si matas el gateway con `kill -9`, aparece `offline`: el Last Will.
+**Verifica:** con `npm run simulador` y `npm run gateway` andando, `docker compose exec mosquitto mosquitto_sub -t 'motores/#' -v` muestra mensajes cada pocos segundos y el estado `online` retenido. Si matas el gateway sin aviso, aparece `offline`: el Last Will. En Windows, el equivalente de `kill -9` es `taskkill /F /PID <pid>` (el gateway muestra su PID al arrancar). Corre el simulador en la terminal de VS Code: sus teclas necesitan una TTY.
 
 **La dominas si…**
 - [ ] Explicas qué son un holding register, un Unit ID y la función 03.
@@ -680,7 +668,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
    - lee el archivo línea por línea y decodifica EEC1 y ET1;
    - agrupa por instante y publica en `motores/sur/MTR-03/telemetria`, con el mismo formato JSON de siempre;
    - usa la hora actual al publicar, como si fuera en vivo; si no, la ingesta rechaza las horas viejas.
-5. Opcional, en un Ubuntu con el módulo `vcan` (en una EC2 suele estar; en WSL puede faltar):
+5. Opcional, en un Ubuntu con el módulo `vcan` (en una EC2 suele estar; en Windows no existe y en WSL 2 suele faltar):
    - `sudo modprobe vcan` y crea la interfaz `vcan0`;
    - instala `can-utils` y reproduce el archivo con `canplayer`.
 
@@ -745,10 +733,11 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 **Pasos**
 
 1. Para que Node-RED llegue al simulador por su nombre, corre el simulador dentro de Compose. Agrega un servicio `simulador`:
-   - imagen `node:24-bookworm-slim`, con la carpeta del proyecto montada en `/app` y `working_dir: /app`;
-   - `command: node src/simulador/motor-modbus.js` y la variable `SIMULADOR_HOST=0.0.0.0`;
+   - imagen `node:26-trixie-slim`, con la carpeta del proyecto montada en `/app` y `working_dir: /app`;
+   - un volumen anónimo en `/app/node_modules` y `command: sh -c "npm ci --omit=dev && node src/simulador/motor-modbus.js"`, para no mezclar el `node_modules` de Windows con Linux;
+   - la variable `SIMULADOR_HOST=0.0.0.0`;
    - el puerto `5020:5020` publicado, para que tu gateway en código lo siga alcanzando en `127.0.0.1`.
-2. Agrega `nodered` a Compose: la imagen `nodered/node-red:4.0` (o la 4.x más reciente), el puerto 1880 y un volumen para `/data`.
+2. Agrega `nodered` a Compose: la imagen `nodered/node-red:5.0`, el puerto 1880 y un volumen para `/data`. La 5.0 trae Node 24, y `node-red-contrib-modbus` exige Node 22 o superior.
 3. En http://localhost:1880, abre *Manage palette* e instala `node-red-contrib-modbus`.
 4. Arma el flujo **inject (cada 2 s) → Modbus Read → function → mqtt out**:
    - *Modbus Read*: servidor `simulador:5020`, Unit ID 2, FC3, dirección 0 y cantidad 8;
@@ -776,7 +765,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 
 **La idea.** Es la prueba con banco de carga de la base: no sabes si aguanta hasta que la cargas. Y, como con las consultas que reservaban 2 GB para usar 63 MB en SQL Server, primero se mide y después se corrige.
 
-**Construyes:** `src/scripts/generar-volumen.js`, `sql/rendimiento.sql` y `docs/rendimiento.md`.
+**Construyes:** `src/scripts/generar-volumen.js`, `practica/rendimiento.sql` y `docs/rendimiento.md`.
 
 **Pasos**
 
@@ -824,7 +813,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 **Pasos**
 
 1. `Dockerfile`, una sola imagen para la API, el gateway y el simulador:
-   - base `node:24-bookworm-slim`;
+   - base `node:26-trixie-slim`: Node 26 LTS sobre Debian 13, porque Debian 12 dejó el soporte regular en julio de 2026;
    - copia primero `package*.json` y ejecuta `npm ci --omit=dev`, para aprovechar la caché de capas;
    - después copia `src` y `public`;
    - crea `/app/datos` con dueño `node`, para el buffer del gateway;
@@ -840,7 +829,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 5. Experimentos:
    - `docker compose restart api`: no se pierde nada, gracias a la sesión persistente;
    - detén `mosquitto` 30 segundos: el buffer del gateway retiene y después drena;
-   - con `docker images`, compara el tamaño de la imagen con base `node:24` y con la `slim`.
+   - con `docker images`, compara el tamaño de la imagen con base `node:26` y con la `slim`.
 
 **Verifica:** el dashboard funciona en http://localhost:3000 con todo en contenedores, y `docker compose ps` muestra todos los servicios arriba.
 
@@ -859,7 +848,14 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 **Objetivo:** desplegar la API y el gateway como servicios de Linux, con nginx adelante, respaldos y vuelta atrás.
 **Tiempo:** 3 horas.
 
-**Dónde:** en tu Ubuntu de WSL, que es gratis, o en una EC2 con Ubuntu 24.04, como en Duoc. La EC2 te deja practicar además el Security Group y el firewall de verdad. En los dos casos, MySQL y Mosquitto siguen en Docker y la API y el gateway corren como servicios.
+**Dónde:** en un Ubuntu 24.04 en WSL 2, que es gratis, o en una EC2 con Ubuntu 24.04, como en Duoc. La EC2 te deja practicar además el Security Group y el firewall de verdad. En los dos casos, MySQL y Mosquitto siguen en Docker y la API y el gateway corren como servicios.
+
+**Prepara el Ubuntu de WSL**, si eliges esa opción. Tu Ubuntu-22.04 actual corre en WSL 1, que no tiene systemd.
+1. En PowerShell: `wsl --install -d Ubuntu-24.04`. Queda en WSL 2, porque es tu versión predeterminada. Crea tu usuario de Linux.
+2. En Ubuntu, `ps -p 1 -o comm=` debe decir `systemd`. Si no, agrega `[boot]` y `systemd=true` a `/etc/wsl.conf`, ejecuta `wsl --shutdown` en PowerShell y vuelve a abrir Ubuntu.
+3. `sudo apt update && sudo apt install -y git curl jq mysql-client mosquitto-clients`.
+4. Docker Desktop → *Settings* → *Resources* → *WSL integration* → activa Ubuntu-24.04, para usar `docker` desde Ubuntu.
+5. Trabaja en `~/` y no en `/mnt/f`: el sistema de archivos de Linux es mucho más rápido.
 
 **La idea.** Es instalar un equipo en terreno: lo llevas, lo conectas, lo dejas con rearme automático (systemd) y le pones una sola entrada controlada (nginx y el firewall).
 
@@ -869,7 +865,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
 
 1. Instala Node para todo el sistema, porque el de nvm vive en tu carpeta personal y systemd no lo ve:
    ```bash
-   curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+   curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash -
    sudo apt install -y nodejs nginx
    ```
 2. Crea el usuario y las carpetas:
@@ -880,7 +876,7 @@ El valor `0x7FFF` en un registro significa "sin dato", por ejemplo un sensor cor
    ```
 3. Guarda los secretos en `/etc/telemetria/api.env` y `/etc/telemetria/gateway.env`, con `chmod 600` y dueño root.
 4. `desplegar.sh <tag>`:
-   - clona ese tag en `/opt/telemetria/releases/<tag>` y ejecuta `npm ci --omit=dev`; en la EC2, usa una *deploy key* de GitHub de solo lectura;
+   - clona ese tag de `https://github.com/Huamagod1/Proyecto_backend.git` en `/opt/telemetria/releases/<tag>` y ejecuta `npm ci --omit=dev`. Como el repositorio es público, no necesita llave; una *deploy key* de solo lectura hace falta solo si lo vuelves privado;
    - apunta el enlace `/opt/telemetria/actual` a esa carpeta;
    - reinicia los servicios y comprueba `/api/salud`;
    - si algo falla, vuelve el enlace a la versión anterior y reinicia. Eso es la vuelta atrás.
@@ -1001,6 +997,8 @@ Son para cuando tengas tiempo. Cada uno toma de 10 a 20 minutos y se hace sin mi
 
 ## Dónde mirar en la solución de referencia
 
+Hoy no la tienes. Si la consigues, déjala en `F:\1. Proyectos personales\Developer Apis\lab-telemetria-motores\`.
+
 | Fase | Archivos en `../lab-telemetria-motores/` |
 |---|---|
 | 2 | `sql/001_esquema.sql`, `sql/002_datos_iniciales.sql`, `sql/003_usuario_app.sql`, `practica/consultas.sql` |
@@ -1021,14 +1019,18 @@ Las fases 8 y 14, y parte de la 11, no tienen referencia: revisa con más calma 
 
 | Síntoma | Causa probable | Solución |
 |---|---|---|
-| `docker: command not found` en Ubuntu | Falta la integración con WSL | Docker Desktop → *Settings* → *Resources* → *WSL integration* |
+| `failed to connect to the docker API at npipe:...` | Docker Desktop está cerrado | Ábrelo y espera *Engine running* |
+| Un comando de docker falla con una ruta `C:/Program Files/Git/...` | Git Bash convirtió una ruta de Linux en una de Windows | `export MSYS_NO_PATHCONV=1` (Fase 0, paso 4) |
+| `$'\r': command not found` o `bad interpreter` al correr un `.sh` | El archivo tiene saltos de línea de Windows (CRLF) | `.gitattributes` con `eol=lf`, `git add --renormalize .` y *Files: Eol* = `\n` en VS Code |
+| `curl` pide parámetros raros en PowerShell | En PowerShell 5.1, `curl` es `Invoke-WebRequest` | Usa Git Bash, o `curl.exe` |
+| `git push` dice `Permission denied (publickey)` | Tu llave SSH no está en la cuenta Huamagod1 | Fase 0, paso 7 |
 | Cambiaste `sql/` y no pasa nada | Esos archivos corren solo al crear el volumen | `docker compose down -v` (borra los datos) y `docker compose up -d` |
-| `ER_ACCESS_DENIED_ERROR` | La clave de `.env` no calza con `003_usuario_app.sql` | Revisa las dos |
-| El puerto 3306 está ocupado | Otro MySQL instalado en Windows | Usa `3307:3306` y `DB_PUERTO=3307` |
-| Todo anda lento en WSL | El proyecto está en `/mnt/c` | Muévelo a `~/proyectos` |
-| Aviso `ExperimentalWarning` de SQLite | `node:sqlite` todavía se marca como experimental | `--disable-warning=ExperimentalWarning` en el script |
+| `ER_ACCESS_DENIED_ERROR` | Cambiaste `DB_CLAVE` después de crear la base: `003_usuario_app.sh` corre solo al crearla | Recrea el volumen, o cambia la clave como root con `ALTER USER` |
+| El puerto 3306 está ocupado | Arrancó tu servicio `MySQL93` de Windows | Detenlo (`Stop-Service MySQL93` en PowerShell como administrador), o usa `3307:3306` y `DB_PUERTO=3307` |
+| Aviso `ExperimentalWarning` de SQLite | Tu Node es la 24.4 o anterior: ahí `node:sqlite` todavía avisa | `--disable-warning=ExperimentalWarning` en el script, o Node 26 |
 | Mosquitto rechaza conexiones | Falta el `listener`, o activaste la seguridad sin credenciales | Revisa `mosquitto.conf` y el usuario |
-| Mosquitto avisa por permisos del archivo de claves | El archivo es legible por todos | `chmod 0700` al archivo |
+| Mosquitto avisa por permisos del archivo de claves | En Windows, el archivo montado se ve con permisos abiertos y `chmod` no los cambia | Es solo un aviso. En Linux: `chmod 0700` y dueño `mosquitto` |
+| El simulador no reacciona a las teclas | La terminal no es una TTY (Git Bash fuera de VS Code) | Córrelo en la terminal de VS Code |
 | El WebSocket no conecta detrás de nginx | Faltan los encabezados `Upgrade` y `Connection` | Revisa el `location /ws` (Fase 13, paso 6) |
-| `systemctl` dice que no hay systemd en WSL | Falta `systemd=true` | Fase 0, paso 3 |
+| `systemctl` dice que no hay systemd | Ubuntu en WSL 1, o falta `systemd=true` | Fase 13, "Prepara el Ubuntu de WSL" |
 | Una lectura sale rechazada por la hora | El ejemplo tiene una hora vieja o futura | Usa la hora actual: `date -u +%Y-%m-%dT%H:%M:%SZ` |
