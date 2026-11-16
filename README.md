@@ -34,6 +34,7 @@ Terreno simulado, cada uno en su terminal (la de VS Code, para que el simulador 
 npm run api          # ingesta HTTP y MQTT
 npm run simulador    # Modbus TCP en el puerto 5020: MTR-01 y MTR-02
 npm run gateway      # lee Modbus, guarda en SQLite y publica por MQTT
+npm run can          # decodifica practica/candump-ejemplo.log (J1939) y publica MTR-03
 ```
 
 API y pruebas:
@@ -60,4 +61,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 7 · Terreno: simulador Modbus y gateway con buffer.
+Fase 8 · CAN y J1939: decodificar tramas del motor.

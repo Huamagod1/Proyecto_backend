@@ -12,3 +12,7 @@ topic read motores/#
 # SEGURIDAD: aunque roben su clave, no puede inyectar datos de otra faena.
 user gw-norte
 topic write motores/norte/#
+
+# El publicador CAN del sitio sur (Fase 8, MTR-03): solo escribe en su sitio.
+user gw-sur
+topic write motores/sur/#
