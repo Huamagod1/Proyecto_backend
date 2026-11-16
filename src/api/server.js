@@ -1,17 +1,30 @@
 /**
  * server.js · punto de entrada de la API: abre el puerto y hace el apagado ordenado (Fase 3).
  * Arranca con `npm run api` (o `npm run api:dev`, que reinicia al guardar cambios).
- * Las fases 6 y 9 suman al apagado el cierre de MQTT, del loteador y de los WebSocket.
+ * Fase 5: carga el catálogo. Fase 6: inicia la ingesta MQTT y el loteador que escribe en MySQL.
+ * La Fase 9 suma el WebSocket.
  */
 import { crearApp } from './app.js';
 import { cerrarPool } from './db.js';
 import { cargarCatalogo, iniciarRefresco, detenerRefresco } from './catalogo.js';
+import { crearLoteador } from './loteador.js';
+import { iniciarIngestaMqtt } from './ingesta-mqtt.js';
+import { guardarLote } from './repositorio.js';
 import { config } from '../comun/config.js';
 
 // Fase 5: el catálogo de motores y variables se carga al arrancar y se refresca cada 60 s.
 // Si MySQL todavía no responde, no se cae: la primera lectura que llegue lo vuelve a intentar.
 cargarCatalogo().catch((err) => console.error('catálogo: no pude cargarlo al arrancar:', err.message));
 iniciarRefresco();
+
+// Fase 6: lo que llega por MQTT se junta en el loteador y se escribe con guardarLote (repositorio.js).
+const loteador = crearLoteador({ escribir: guardarLote });
+const ingesta = iniciarIngestaMqtt({
+  url: config.mqtt.url,
+  usuario: config.mqtt.usuario,
+  clave: config.mqtt.clave,
+  loteador,
+});
 
 const app = crearApp();
 
@@ -28,7 +41,8 @@ const servidor = app.listen(config.puerto, (err) => {
 let apagando = false;
 
 /**
- * Apagado ordenado: deja de aceptar conexiones, espera las peticiones en curso y cierra el pool.
+ * Apagado ordenado, de afuera hacia adentro: primero se dejan de recibir datos, después se escribe
+ * lo pendiente y al final se cierra la base, que los pasos anteriores todavía necesitan.
  * @param {string} senal la señal recibida: 'SIGINT' (Ctrl+C) o 'SIGTERM' (Docker, systemd)
  * Efecto: termina el proceso con código 0 si todo cerró bien, o 1 si no.
  */
@@ -45,16 +59,24 @@ async function apagar(senal) {
     process.exit(1);
   }, 8_000).unref();
 
-  detenerRefresco(); // sin más consultas periódicas al catálogo
-
-  // close(): deja de aceptar conexiones nuevas y espera que terminen las peticiones en curso.
-  // Desde Node 19 también cierra las conexiones keep-alive que están ociosas.
-  servidor.close(async (err) => {
-    if (err) console.error('Error al cerrar el servidor HTTP:', err.message);
-    await cerrarPool(); // OJO: el pool se cierra después del HTTP; una petición en curso aún puede usarlo
-    console.log('Apagado completo');
-    process.exit(err ? 1 : 0);
-  });
+  let codigo = 0;
+  try {
+    detenerRefresco(); // sin más consultas periódicas al catálogo
+    // 1. HTTP: close() deja de aceptar conexiones y espera las peticiones en curso. Desde Node 19
+    //    también cierra las conexiones keep-alive ociosas.
+    await new Promise((resolve, reject) => servidor.close((err) => (err ? reject(err) : resolve())));
+    // 2. MQTT: no entran más mensajes. La sesión persistente sigue en el broker y guarda lo que llegue.
+    await ingesta.detener();
+    // 3. Loteador: escribe lo pendiente mientras el pool sigue abierto.
+    if ((await loteador.detener()) > 0) codigo = 1;
+    // 4. Pool: al final, porque los pasos anteriores lo usan.
+    await cerrarPool();
+  } catch (err) {
+    console.error('Error durante el apagado:', err.message);
+    codigo = 1;
+  }
+  console.log('Apagado completo');
+  process.exit(codigo);
 }
 
 // OJO: en Windows, Ctrl+C entrega SIGINT, pero SIGTERM entre procesos no existe: se prueba en

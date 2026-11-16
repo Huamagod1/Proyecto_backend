@@ -75,7 +75,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 - [x] Fase 3 · API base con Express (2–3 h)
 - [x] Fase 4 · Seguridad: login, roles, permiso por sitio y auditoría (3 h)
 - [x] Fase 5 · Ingesta HTTP: validar y no duplicar (2 h)
-- [ ] Fase 6 · MQTT: broker, tópicos y loteador (3 h)
+- [x] Fase 6 · MQTT: broker, tópicos y loteador (3 h)
 - [ ] Fase 7 · Terreno: simulador Modbus y gateway con buffer (3–4 h)
 - [ ] Fase 8 · CAN y J1939: decodificar tramas del motor (1–2 h)
 - [ ] Fase 9 · Tiempo real: WebSocket y dashboard (2–3 h)
@@ -506,7 +506,7 @@ En MySQL: `SELECT usuario, metodo, recurso, estado_http FROM auditoria_accesos O
 
 **Pasos**
 
-1. Agrega `mosquitto` a Compose: `eclipse-mosquitto:2.1` (la versión vigente, fija hasta el minor), el puerto 1883 y tu `mosquitto.conf` montado.
+1. Agrega `mosquitto` a Compose: `eclipse-mosquitto:2.1-alpine` (la versión vigente, fija hasta el minor; la 2.1 solo se publica con el sufijo `-alpine`), el puerto 1883 y tu `mosquitto.conf` montado.
    - Mosquitto 2 exige declarar `listener 1883`.
    - Por ahora usa `allow_anonymous true`, y activa `persistence true`.
 2. Diseña los tópicos en `docs/topicos.md`:
@@ -1030,7 +1030,8 @@ Las fases 8 y 14, y parte de la 11, no tienen referencia: revisa con más calma 
 | El puerto 3306 está ocupado | Arrancó tu servicio `MySQL93` de Windows | Detenlo (`Stop-Service MySQL93` en PowerShell como administrador), o usa `3307:3306` y `DB_PUERTO=3307` |
 | Aviso `ExperimentalWarning` de SQLite | Tu Node es la 24.4 o anterior: ahí `node:sqlite` todavía avisa | `--disable-warning=ExperimentalWarning` en el script, o Node 26 |
 | Mosquitto rechaza conexiones | Falta el `listener`, o activaste la seguridad sin credenciales | Revisa `mosquitto.conf` y el usuario |
-| Mosquitto avisa por permisos del archivo de claves | En Windows, el archivo montado se ve con permisos abiertos y `chmod` no los cambia | Es solo un aviso. En Linux: `chmod 0700` y dueño `mosquitto` |
+| Mosquitto no arranca: `Unable to open pwfile` | `passwd` lo creó root con permisos 0600 y el broker corre como `mosquitto` (uid 1883) | `bash src/scripts/claves-mqtt.sh`: lo crea con `--user 1883:1883` |
+| Mosquitto avisa que el dueño del `acl` o del `passwd` no es `mosquitto` | El archivo es de root o lo pueden leer otros | `claves-mqtt.sh` hace `chown 1883` y `chmod 0600` desde un contenedor; Docker Desktop lo respeta aunque el archivo esté en Windows |
 | El simulador no reacciona a las teclas | La terminal no es una TTY (Git Bash fuera de VS Code) | Córrelo en la terminal de VS Code |
 | El WebSocket no conecta detrás de nginx | Faltan los encabezados `Upgrade` y `Connection` | Revisa el `location /ws` (Fase 13, paso 6) |
 | `systemctl` dice que no hay systemd | Ubuntu en WSL 1, o falta `systemd=true` | Fase 13, "Prepara el Ubuntu de WSL" |

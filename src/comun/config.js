@@ -22,6 +22,10 @@ const esquema = z.object({
   // SEGURIDAD: con HS256, quien conoce el secreto puede fabricar tokens válidos. 32 caracteres o
   // más (256 bits en hexadecimal) hacen inviable adivinarlo por fuerza bruta.
   JWT_SECRETO: z.string({ error: 'es obligatorio' }).min(32, 'debe tener 32 caracteres o más'),
+  // Fase 6: broker MQTT. Usuario y clave son opcionales: sin ellos, la conexión es anónima.
+  MQTT_URL: z.string().regex(/^mqtts?:\/\//, 'debe empezar con mqtt:// o mqtts://').default('mqtt://127.0.0.1:1883'),
+  MQTT_USUARIO: z.string().min(1).optional(),
+  MQTT_CLAVE: z.string().min(1).optional(),
 });
 
 const resultado = esquema.safeParse(process.env);
@@ -46,4 +50,5 @@ export const config = Object.freeze({
     secreto: env.JWT_SECRETO,
     duracionSeg: 15 * 60, // 15 min en s: si roban un token, sirve poco tiempo
   }),
+  mqtt: Object.freeze({ url: env.MQTT_URL, usuario: env.MQTT_USUARIO, clave: env.MQTT_CLAVE }),
 });

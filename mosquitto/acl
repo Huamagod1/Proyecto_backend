@@ -1,0 +1,14 @@
+# acl · permisos de cada usuario del broker (Fase 6, paso 9). Lo carga el plugin mosquitto_acl_file.
+# Sintaxis: "user <nombre>" abre la sección de ese usuario; debajo, "topic read|write|readwrite <tópico>".
+# CONCEPTO: lista blanca. Lo que no está escrito aquí, está prohibido.
+# OJO: si un cliente publica donde no puede, en MQTT 3.1.1 el broker descarta el mensaje en
+# silencio (no hay error); en MQTT 5 responde "Not authorized".
+
+# La API lee la telemetría y el estado de todos los sitios; no puede publicar nada.
+user api
+topic read motores/#
+
+# El gateway del sitio norte solo escribe en su sitio: telemetría, su estado y su Last Will.
+# SEGURIDAD: aunque roben su clave, no puede inyectar datos de otra faena.
+user gw-norte
+topic write motores/norte/#

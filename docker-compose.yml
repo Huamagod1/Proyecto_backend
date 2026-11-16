@@ -1,4 +1,4 @@
-# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: solo MySQL).
+# docker-compose.yml · servicios de apoyo del proyecto (Fase 2: MySQL; Fase 6: Mosquitto).
 # Compose lee las ${VARIABLES} de tu .env (misma carpeta), así las claves no quedan escritas aquí.
 # Cada fase agrega lo suyo: Mosquitto (6), simulador y Node-RED (10), API y gateway (12).
 # Uso: docker compose up -d --wait · docker compose ps · docker compose logs -f mysql
@@ -33,5 +33,16 @@ services:
       start_period: 60s                               # gracia inicial: crear la base toma de 20 a 60 s
     restart: unless-stopped                           # vuelve solo al reiniciar Docker, salvo que lo detengas tú
 
+  mosquitto:
+    image: eclipse-mosquitto:2.1-alpine               # broker MQTT 2.1.x; OJO: la 2.1 solo se publica con sufijo -alpine
+    ports:
+      - "1883:1883"                                   # MQTT sin TLS, para el gateway y la API en tu equipo
+    volumes:
+      # Configuración: mosquitto.conf, acl y passwd. Sin :ro porque claves-mqtt.sh escribe el passwd.
+      - ./mosquitto:/mosquitto/config
+      - datos-mosquitto:/mosquitto/data               # persistencia: sesiones y mensajes QoS 1 pendientes
+    restart: unless-stopped
+
 volumes:
   datos-mysql:                                        # Compose lo crea como telemetria_datos-mysql
+  datos-mosquitto:                                    # sobrevive a reinicios y a docker compose down (sin -v)

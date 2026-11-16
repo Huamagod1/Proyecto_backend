@@ -22,8 +22,11 @@ Los apuntes de estudio de cada fase están en [docs/apuntes/](docs/apuntes/).
 ```bash
 cp .env.example .env              # y pon tus claves
 npm install
-docker compose up -d --wait       # MySQL 8.4; la primera vez crea la base con sql/
+docker compose up -d --wait       # MySQL 8.4 y Mosquitto 2.1; la primera vez crea la base con sql/
+bash src/scripts/claves-mqtt.sh   # usuarios del broker (api, gw-norte) desde .env
 ```
+
+Tópicos y formato de los mensajes MQTT: [docs/topicos.md](docs/topicos.md).
 
 API y pruebas:
 
@@ -49,4 +52,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 5 · Ingesta HTTP: validar y no duplicar.
+Fase 6 · MQTT: broker, tópicos y loteador.
