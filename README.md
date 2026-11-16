@@ -37,6 +37,9 @@ npm run gateway      # lee Modbus, guarda en SQLite y publica por MQTT
 npm run can          # decodifica practica/candump-ejemplo.log (J1939) y publica MTR-03
 ```
 
+Dashboard en vivo: abre http://localhost:3000 e inicia sesión (por ejemplo, `ing-norte` con la clave
+`CLAVE_ING_NORTE` de tu `.env`). Cada usuario ve solo los motores de su sitio.
+
 API y pruebas:
 
 ```bash
@@ -61,4 +64,4 @@ docker compose exec -T mysql sh -c 'mysql -t -u telemetria_app -p"$DB_CLAVE" tel
 
 ## En qué fase va
 
-Fase 8 · CAN y J1939: decodificar tramas del motor.
+Fase 9 · Tiempo real: WebSocket y dashboard.

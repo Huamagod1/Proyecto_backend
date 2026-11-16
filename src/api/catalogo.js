@@ -8,7 +8,11 @@
 import { pool } from './db.js';
 
 // El catálogo vigente. Se reemplaza entero en cada carga: quien lo lee nunca ve un Map a medio llenar.
-let actual = { motores: new Map(), variables: new Map(), sitios: new Map(), cargadoEn: null };
+let actual = {
+  motores: new Map(), variables: new Map(), sitios: new Map(),
+  motoresPorId: new Map(), variablesPorId: new Map(), // Fase 9: de las filas (con id) a los códigos
+  cargadoEn: null,
+};
 let cargaEnCurso = null;
 let temporizador = null;
 
@@ -31,6 +35,8 @@ export function cargarCatalogo() {
       motores: new Map(motores.map((m) => [m.codigo, m])),     // 'MTR-01' → { id, sitio_id, ... }
       variables: new Map(variables.map((v) => [v.codigo, v])), // 'rpm' → { id, minimo, maximo, ... }
       sitios: new Map(sitios.map((s) => [s.codigo, s])),       // 'norte' → { id, codigo }
+      motoresPorId: new Map(motores.map((m) => [m.id, m])),    // 1 → el mismo objeto de MTR-01
+      variablesPorId: new Map(variables.map((v) => [v.id, v])),
       cargadoEn: new Date(),
     };
   })().finally(() => {
@@ -53,6 +59,8 @@ export const catalogo = {
   motor: (codigo) => actual.motores.get(codigo),
   variable: (codigo) => actual.variables.get(codigo),
   sitio: (codigo) => actual.sitios.get(codigo),
+  motorPorId: (id) => actual.motoresPorId.get(id),
+  variablePorId: (id) => actual.variablesPorId.get(id),
 };
 
 /**

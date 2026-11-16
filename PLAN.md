@@ -78,7 +78,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 - [x] Fase 6 · MQTT: broker, tópicos y loteador (3 h)
 - [x] Fase 7 · Terreno: simulador Modbus y gateway con buffer (3–4 h)
 - [x] Fase 8 · CAN y J1939: decodificar tramas del motor (1–2 h)
-- [ ] Fase 9 · Tiempo real: WebSocket y dashboard (2–3 h)
+- [x] Fase 9 · Tiempo real: WebSocket y dashboard (2–3 h)
 - [ ] Fase 10 · Node-RED: el gateway en bloques (1–2 h)
 - [ ] Fase 11 · SQL con volumen: millones de filas (3 h)
 - [ ] Fase 12 · Docker: todo con un comando (2 h)

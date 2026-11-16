@@ -2,29 +2,22 @@
  * server.js · punto de entrada de la API: abre el puerto y hace el apagado ordenado (Fase 3).
  * Arranca con `npm run api` (o `npm run api:dev`, que reinicia al guardar cambios).
  * Fase 5: carga el catálogo. Fase 6: inicia la ingesta MQTT y el loteador que escribe en MySQL.
- * La Fase 9 suma el WebSocket.
+ * Fase 9: WebSocket en /ws; el loteador avisa cada escritura confirmada y la ingesta cada cambio
+ * de estado de un gateway, y tiempo-real.js lo empuja a los dashboards.
  */
 import { crearApp } from './app.js';
 import { cerrarPool } from './db.js';
-import { cargarCatalogo, iniciarRefresco, detenerRefresco } from './catalogo.js';
+import { cargarCatalogo, iniciarRefresco, detenerRefresco, catalogo } from './catalogo.js';
 import { crearLoteador } from './loteador.js';
 import { iniciarIngestaMqtt } from './ingesta-mqtt.js';
 import { guardarLote } from './repositorio.js';
+import { iniciarTiempoReal, lecturasAMensajes } from './tiempo-real.js';
 import { config } from '../comun/config.js';
 
 // Fase 5: el catálogo de motores y variables se carga al arrancar y se refresca cada 60 s.
 // Si MySQL todavía no responde, no se cae: la primera lectura que llegue lo vuelve a intentar.
 cargarCatalogo().catch((err) => console.error('catálogo: no pude cargarlo al arrancar:', err.message));
 iniciarRefresco();
-
-// Fase 6: lo que llega por MQTT se junta en el loteador y se escribe con guardarLote (repositorio.js).
-const loteador = crearLoteador({ escribir: guardarLote });
-const ingesta = iniciarIngestaMqtt({
-  url: config.mqtt.url,
-  usuario: config.mqtt.usuario,
-  clave: config.mqtt.clave,
-  loteador,
-});
 
 const app = crearApp();
 
@@ -36,6 +29,32 @@ const servidor = app.listen(config.puerto, (err) => {
   }
   // process.pid: sirve para detener este proceso desde otra terminal (taskkill /PID en Windows).
   console.log(`API escuchando en http://localhost:${config.puerto} (PID ${process.pid})`);
+});
+
+/** Mensaje de estado de un gateway para el dashboard, con el id de su sitio para filtrar. */
+const mensajeGateway = (id, info) => ({ tipo: 'gateway', id, ...info, sitio_id: catalogo.sitio(info.sitio)?.id });
+
+// Fase 9: el WebSocket comparte el puerto HTTP. Al conectarse, cada dashboard recibe el estado
+// actual de los gateways que puede ver (ingesta se define más abajo; se lee al conectar).
+const tiempoReal = iniciarTiempoReal(servidor, {
+  estadoInicial: () => [...ingesta.gateways].map(([id, info]) => mensajeGateway(id, info)),
+});
+
+// Fase 6: lo que llega por MQTT se junta en el loteador y se escribe con guardarLote (repositorio.js).
+// Fase 9: alEscribir se llama DESPUÉS del commit. POR QUÉ: el dashboard nunca muestra un dato que
+// no quedó guardado; si la base falla, no se avisa nada y el lote se reintenta.
+const loteador = crearLoteador({
+  escribir: guardarLote,
+  alEscribir: (lote) => {
+    for (const mensaje of lecturasAMensajes(lote, catalogo)) tiempoReal.difundir(mensaje);
+  },
+});
+const ingesta = iniciarIngestaMqtt({
+  url: config.mqtt.url,
+  usuario: config.mqtt.usuario,
+  clave: config.mqtt.clave,
+  loteador,
+  alCambiarGateway: (id, info) => tiempoReal.difundir(mensajeGateway(id, info)),
 });
 
 let apagando = false;
@@ -62,6 +81,8 @@ async function apagar(senal) {
   let codigo = 0;
   try {
     detenerRefresco(); // sin más consultas periódicas al catálogo
+    // 0. WebSocket: cierra los dashboards con 1001 ("me voy"); el navegador se reconectará solo.
+    tiempoReal.cerrar();
     // 1. HTTP: close() deja de aceptar conexiones y espera las peticiones en curso. Desde Node 19
     //    también cierra las conexiones keep-alive ociosas.
     await new Promise((resolve, reject) => servidor.close((err) => (err ? reject(err) : resolve())));

@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  index.html · dashboard de telemetría (Fase 9). Lo sirve Express con express.static('public').
+  Sin frameworks: la lógica está en app.js y el estilo en estilos.css.
+  SEGURIDAD: no hay JavaScript dentro del HTML; la política de seguridad de helmet (CSP) bloquea
+  los scripts en línea y los atributos onclick.
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Telemetría de motores</title>
+    <link rel="stylesheet" href="estilos.css" />
+    <!-- type="module": app.js usa import/export y se ejecuta después de cargar el HTML -->
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="barra">
+      <h1>Telemetría de motores</h1>
+      <div class="sesion">
+        <span id="quien"></span>
+        <span id="conexion" class="punto" title="WebSocket"></span>
+        <button id="salir" type="button" hidden>Salir</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- Vista 1: login -->
+      <section id="vista-login" class="tarjeta login">
+        <h2>Iniciar sesión</h2>
+        <form id="form-login">
+          <label>Usuario <input name="usuario" autocomplete="username" required /></label>
+          <label>Contraseña <input name="clave" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">Entrar</button>
+          <p id="error-login" class="error" role="alert"></p>
+        </form>
+      </section>
+
+      <!-- Vista 2: panel en vivo -->
+      <section id="vista-panel" hidden>
+        <div id="alertas"></div>
+        <h2>Gateways</h2>
+        <div id="gateways" class="gateways"></div>
+        <h2>Motores</h2>
+        <div id="motores" class="motores"></div>
+      </section>
+    </main>
+  </body>
+</html>

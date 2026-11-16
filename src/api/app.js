@@ -4,6 +4,7 @@
  * supertest, sin red. La Fase 4 suma helmet, auditoría, login y consulta de auditoría; las
  * siguientes, lecturas (5) y tiempo real (9).
  */
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import { pool } from './db.js';
@@ -27,7 +28,15 @@ export function crearApp() {
   // helmet(): encabezados de seguridad en cada respuesta. Entre otros: X-Content-Type-Options
   // (el navegador no adivina tipos), Content-Security-Policy (solo scripts propios), quita
   // X-Powered-By (no anuncia "Express") y Strict-Transport-Security (fuerza HTTPS con TLS).
-  app.use(helmet());
+  // Fase 9: sin 'upgrade-insecure-requests'. OJO: esa directiva hace que el navegador pida todo
+  // por https:// y wss://; con la API en http://localhost (sin TLS) el dashboard no cargaría.
+  // Con TLS en nginx (Fase 13) se puede volver a activar.
+  app.use(helmet({ contentSecurityPolicy: { directives: { 'upgrade-insecure-requests': null } } }));
+
+  // Fase 9: el dashboard (public/). Va antes de la auditoría: son archivos públicos que no tocan
+  // datos, y anotar cada .css o .js llenaría la tabla. La ruta sale de este archivo y no de la
+  // carpeta desde la que se lanzó node (cwd), que puede cambiar.
+  app.use(express.static(fileURLToPath(new URL('../../public', import.meta.url))));
 
   // Auditoría antes del parser y de las rutas: así también quedan anotados un JSON roto (400) o
   // una ruta inexistente (404).
