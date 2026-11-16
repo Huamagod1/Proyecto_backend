@@ -70,7 +70,7 @@ Todo corre en Docker Compose y, al final, como servicios systemd detrás de ngin
 ## Avance
 
 - [ ] Fase 0 · Entorno de trabajo (1 h)
-- [ ] Fase 1 · Git y esqueleto del proyecto (1 h)
+- [x] Fase 1 · Git y esqueleto del proyecto (1 h)
 - [ ] Fase 2 · MySQL: modelo de datos y consultas (2–3 h)
 - [ ] Fase 3 · API base con Express (2–3 h)
 - [ ] Fase 4 · Seguridad: login, roles, permiso por sitio y auditoría (3 h)

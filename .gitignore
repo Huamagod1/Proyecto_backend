@@ -1,0 +1,21 @@
+# .gitignore · lo que Git no sube nunca (Fase 1).
+# OJO: los comentarios van en su propia línea; un # al final de una regla es parte del patrón.
+
+# Dependencias: se reinstalan con `npm ci` a partir de package-lock.json, que sí se sube.
+node_modules/
+
+# SEGURIDAD: secretos locales. `.env` y sus variantes (`.env.test`) se quedan en tu equipo...
+.env
+.env.*
+# ...salvo la plantilla, que no tiene valores reales.
+!.env.example
+
+# Bases SQLite locales: el buffer del gateway (Fase 7) y sus archivos WAL y SHM.
+*.sqlite
+*.sqlite-*
+
+# Datos que el proyecto genera en tu equipo (buffer, respaldos de prueba).
+datos/
+
+# SEGURIDAD: hashes de las claves del broker (Fase 6). El repositorio es público.
+mosquitto/passwd

@@ -1,0 +1,22 @@
+{
+  "name": "proyecto_backend",
+  "version": "1.0.0",
+  "description": "Plataforma de telemetría de motores: Modbus, CAN, MQTT, API Node.js, MySQL y tiempo real",
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Huamagod1/Proyecto_backend.git"
+  },
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Huamagod1/Proyecto_backend/issues"
+  },
+  "homepage": "https://github.com/Huamagod1/Proyecto_backend#readme",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "private": true
+}
