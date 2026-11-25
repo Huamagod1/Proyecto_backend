@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "Plataforma de telemetría de motores: Modbus, CAN, MQTT, API Node.js, MySQL y tiempo real",
   "scripts": {
-    "test": "node --env-file=.env.test --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
+    "test": "node --env-file=.env.test --test \"test/*.test.js\"",
     "api": "node --env-file=.env src/api/server.js",
     "api:dev": "node --env-file=.env --watch src/api/server.js",
     "sembrar": "node --env-file=.env src/scripts/sembrar-usuarios.js",
     "lote-ejemplo": "node src/scripts/generar-lote-ejemplo.js",
     "simulador": "node --env-file=.env src/simulador/motor-modbus.js",
-    "gateway": "node --env-file=.env --disable-warning=ExperimentalWarning src/gateway/gateway.js",
+    "gateway": "node --env-file=.env src/gateway/gateway.js",
     "can": "node --env-file=.env src/scripts/can-a-mqtt.js practica/candump-ejemplo.log",
     "nodered:desplegar": "node --env-file=.env src/scripts/desplegar-nodered.js",
     "volumen": "node --env-file=.env src/scripts/generar-volumen.js",
@@ -26,7 +26,7 @@
   },
   "homepage": "https://github.com/Huamagod1/Proyecto_backend#readme",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=26"
   },
   "private": true,
   "dependencies": {
