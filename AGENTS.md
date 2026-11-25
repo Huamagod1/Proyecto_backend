@@ -114,7 +114,7 @@ services:
 3. Actualiza la documentación que la fase cambió, según la tabla "Qué se actualiza cuándo" de `docs/README.md`, y agrega al índice los documentos nuevos.
    - En la Parte 2, agrega la entrada de la fase a `docs/ATLAS-VISUAL.md`, con el diagrama de su apunte (la regla está en **Documentación**).
 4. Agrega al glosario de `docs/OT-TI.md` los términos nuevos que falten, en una línea cada uno.
-5. Propón el mensaje de commit (Conventional Commits, en español) y el tag. El flujo de Git lo hago yo.
+5. Propón el mensaje de commit (Conventional Commits, en español, sin la línea `Co-Authored-By`) y el tag. El flujo de Git lo hago yo.
 
 ## Reglas de la Parte 2
 - **Antes de empezar una fase,** comprueba que estoy en su rama (`fase-NN-nombre`) y que `git status` está limpio. Si no, avísame.
@@ -157,6 +157,8 @@ Cuando escribo `simulacro`:
    - con `me rindo`, explícame todo.
 7. Cuando escriba `resuelto: <causa>`, evalúa la causa, la evidencia y qué pasó con los datos. Si falta algo, pregúntamelo.
 8. Revierte, comprueba de nuevo el estado sano y prepara la ficha como dice el guion. Yo escribo el diagnóstico.
+
+Siempre, no solo en un simulacro: en las búsquedas por todo el repositorio, excluye `docs/simulacros/guion-del-agente.md` (en rg o Grep, con el glob `!docs/simulacros/guion-del-agente.md`), porque la salida de las herramientas también me llega.
 
 ## Sesiones de estudio
 Cuando escribo `estudia <área>`, con un área de `docs/MAPA-DEL-CARGO.md`, das una sesión guiada de 20 a 30 minutos:
