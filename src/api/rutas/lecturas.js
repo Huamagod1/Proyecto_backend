@@ -15,7 +15,7 @@ import { guardarLote } from '../repositorio.js';
 import { ErrorHttp } from '../../comun/errores.js';
 import { validar, esquemaLote, evaluarLectura } from '../../comun/validacion.js';
 
-const SIETE_DIAS_MS = 7 * 24 * 3600 * 1000; // 7 días en ms: unos 60 000 puntos a 1 lectura cada 10 s
+const SIETE_DIAS_MS = 7 * 24 * 3600 * 1000; // 7 días en ms: unos 121 000 puntos a 1 lectura cada 5 s
 const UNA_HORA_MS = 3600 * 1000;           // rango por defecto de una serie
 
 const esquemaSerie = z.object({

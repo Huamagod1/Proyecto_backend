@@ -65,7 +65,10 @@ ALTER TABLE lecturas
 -- Poda: la columna `partitions` del plan debe decir solo p2026_11.
 EXPLAIN SELECT COUNT(*) FROM lecturas WHERE ts >= '2026-11-01' AND ts < '2026-12-01';
 
--- Mantenimiento mensual: se parte la reserva para abrir el mes siguiente (en producción, con un EVENT).
+-- Mantenimiento mensual: se parte la reserva para abrir el mes siguiente. Lo hará un script
+-- programado (Fase 16: mantener-particiones.js), no un EVENT.
+-- POR QUÉ: un EVENT que falla solo deja una línea en el log de errores de MySQL, y nadie se entera;
+-- el script deja log y código de salida, y en la Fase 23 tendrá su alerta.
 -- ALTER TABLE lecturas REORGANIZE PARTITION p_futuro INTO (
 --   PARTITION p2027_01 VALUES LESS THAN ('2027-02-01'),
 --   PARTITION p_futuro VALUES LESS THAN (MAXVALUE));

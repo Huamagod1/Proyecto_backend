@@ -14,14 +14,25 @@ Node-RED (Modbus en bloques) ─────────────────
              agregados, particiones)                                  y MQTT de solo lectura ──> SCADA / EMS
 ```
 
-- **Para entender todo el proyecto desde cero:** [docs/GUIA.md](docs/GUIA.md): arquitectura, herramientas con su sintaxis, diagramas y ruta de estudio.
-- **Plan** fase por fase: [PLAN.md](PLAN.md) · **avance:** [PROGRESO.md](PROGRESO.md) · **apuntes de estudio:** [docs/apuntes/](docs/apuntes/)
-- **Decisiones de diseño:** [docs/decisiones.md](docs/decisiones.md) · **rendimiento medido:** [docs/rendimiento.md](docs/rendimiento.md) · **runbook:** [docs/RUNBOOK.md](docs/RUNBOOK.md)
-- **Tópicos MQTT:** [docs/topicos.md](docs/topicos.md) · **J1939:** [docs/j1939.md](docs/j1939.md) · **RS485:** [docs/rs485.md](docs/rs485.md)
+## Documentación
+
+| Documento | Tipo | Responde a | Lectura |
+|---|---|---|---|
+| [docs/README.md](docs/README.md) | Consultar | ¿Qué leo según lo que necesito, y qué documentos existen? | 5 min |
+| [docs/GUIA.md](docs/GUIA.md) | Entender | ¿Cómo funciona todo, desde cero? | 30 min (secciones 1 a 4) |
+| [docs/COMO-ABORDAR.md](docs/COMO-ABORDAR.md) | Entender | ¿Cómo leo y estudio un proyecto de este tamaño? | 25 min |
+| [docs/CRITERIO.md](docs/CRITERIO.md) | Entender | ¿Cómo decido rápido y bien? | 5 min (la tarjeta de bolsillo) |
+| [docs/OT-TI.md](docs/OT-TI.md) | Entender | ¿Qué hacer y qué no en un ambiente industrial? | 40 min |
+| [docs/ATLAS-VISUAL.md](docs/ATLAS-VISUAL.md) | Entender | ¿Cómo se ve cada idea del proyecto, en un dibujo? | 15 min |
+| [docs/MAPA-DEL-CARGO.md](docs/MAPA-DEL-CARGO.md) | Consultar | ¿Qué pide el cargo, dónde lo construye el proyecto y cuánto lo domino? | 5 min |
+| [PLAN-2.md](PLAN-2.md) | Aprender | ¿Qué construyo en cada fase de la Parte 2, y cómo lo verifico? | 10 min por fase |
+
+- **Plan y avance:** [PLAN.md](PLAN.md) (Parte 1, fases 0 a 14) · [PROGRESO.md](PROGRESO.md) · apuntes por fase en [docs/apuntes/](docs/apuntes/) · decisiones de diseño en [docs/decisiones.md](docs/decisiones.md)
+- **Operar y consultar:** [docs/RUNBOOK.md](docs/RUNBOOK.md) · tópicos MQTT en [docs/topicos.md](docs/topicos.md) · [docs/j1939.md](docs/j1939.md) · [docs/rs485.md](docs/rs485.md) · rendimiento medido en [docs/rendimiento.md](docs/rendimiento.md)
 
 ## Requisitos
 
-- Windows 11 con Git Bash (o Linux) y Node 22.13 o superior (recomendado: Node 26 LTS).
+- Windows 11 con Git Bash (o Linux) y Node 26 LTS o superior.
 - Docker Desktop con Docker Compose v2.
 
 ## Levantarlo todo en contenedores

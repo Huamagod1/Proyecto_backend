@@ -17,6 +17,7 @@
 | Construir pantallas (para el front) | `docs/api/` (Fase 22) y `docs/catalogo.md` (Fase 17) | 20 min |
 | Cambiar el esquema de la base | `migraciones/` (Fase 16) y las reglas de `AGENTS.md` | 10 min |
 | Repasar una fase | `docs/apuntes/fase-NN.md` | 10 min |
+| Repasar con dibujos, una idea por diagrama | `docs/ATLAS-VISUAL.md` | 15 min |
 | Ver en qué voy | `PROGRESO.md` | 2 min |
 
 ## Los cuatro tipos de documento
@@ -28,35 +29,39 @@ La documentación se separa según para qué se usa: es el marco Diátaxis. Mezc
 | **Aprender** (tutoriales) | Adquirir una habilidad haciendo | Una vez, en orden | `PLAN.md`, `PLAN-2.md` y `docs/apuntes/` |
 | **Resolver** (guías prácticas) | Lograr algo concreto, ahora | En el momento en que se necesita | `docs/RUNBOOK.md`, `docs/procedimientos/` y las fichas de `docs/simulacros/` |
 | **Consultar** (referencia) | Buscar un dato exacto | A saltos | `docs/topicos.md`, `docs/j1939.md`, `docs/rs485.md`, `docs/catalogo.md`, `docs/api/`, `docs/rendimiento.md` y los glosarios |
-| **Entender** (explicación) | Saber por qué las cosas son así | Con calma | `docs/GUIA.md`, `docs/OT-TI.md`, `docs/COMO-ABORDAR.md`, `docs/CRITERIO.md` y `docs/decisiones.md` |
+| **Entender** (explicación) | Saber por qué las cosas son así | Con calma | `docs/GUIA.md`, `docs/OT-TI.md`, `docs/COMO-ABORDAR.md`, `docs/CRITERIO.md`, `docs/ATLAS-VISUAL.md` y `docs/decisiones.md` |
 
 ## Inventario
 
-| Documento | Tipo | Responde a | Desde |
-|---|---|---|---|
-| `README.md` (raíz) | Resolver | ¿Cómo levanto y uso el sistema? | Parte 1 |
-| `PLAN.md` y `PLAN-2.md` | Aprender | ¿Qué construyo en cada fase, y cómo lo verifico? | Partes 1 y 2 |
-| `PROGRESO.md` | Consultar | ¿En qué voy, y qué dudas quedaron? | Parte 1 |
-| `AGENTS.md` y `PROMPTS.md` | Consultar | ¿Cómo trabaja el agente, y qué le pido? | Parte 1 |
-| `docs/GUIA.md` | Entender | ¿Cómo funciona todo, desde cero? | Parte 1 |
-| `docs/COMO-ABORDAR.md` | Entender | ¿Cómo leo y estudio un proyecto de este tamaño? | Parte 2 |
-| `docs/CRITERIO.md` | Entender | ¿Cómo decido rápido y bien? | Parte 2 |
-| `docs/OT-TI.md` | Entender | ¿Qué hacer y qué no en un ambiente industrial? | Parte 2 |
-| `docs/decisiones.md` | Entender | ¿Por qué se hizo así? | Parte 1 |
-| `docs/RUNBOOK.md` | Resolver | ¿Qué hago cuando algo falla? | Parte 1 |
-| `docs/topicos.md`, `docs/j1939.md` y `docs/rs485.md` | Consultar | ¿Cómo son los mensajes y los protocolos? | Parte 1 |
-| `docs/rendimiento.md` | Consultar | ¿Cuánto tardan las consultas, antes y después? | Parte 1 |
-| `docs/apuntes/fase-NN.md` | Aprender | ¿Qué aprendí en cada fase? | Parte 1 |
-| `docs/simulacros/` | Resolver | ¿Qué fallas practiqué, y cómo las encontré? | Fase 15 |
-| `docs/casos.md` | Consultar | ¿Qué decidí en cada `caso`, y qué aprendí? | Parte 2 |
-| `docs/catalogo.md` | Consultar | ¿Qué variables existen, con qué unidad y qué rangos? | Fase 17 |
-| `docs/calidad.md` | Entender | ¿Qué se marca, qué se aparta y quién lo revisa? | Fase 19 |
-| `docs/api/` | Consultar | ¿Qué entrega la API, y cómo cambia sin romper? | Fase 22 |
-| `docs/operacion/` | Resolver | Objetivos, continuidad, capacidad, calendario y responsables | Fases 23 a 30 |
-| `docs/plantillas/` | Resolver | Plantillas de cambio y de postmortem | Fase 25 |
-| `docs/seguridad/` | Entender | Zonas, amenazas y endurecimiento | Fase 27 |
-| `docs/procedimientos/` y `docs/actas/` | Resolver | ¿Cómo doy de alta o de baja un sitio, y qué se probó? | Fase 29 |
-| `docs/lista-de-produccion.md` | Consultar | ¿Está listo para producción, con qué evidencia? | Fase 30 |
+La columna **Estado** dice si el documento ya existe o en qué fase nace. Lo pendiente no se lee como hecho.
+
+| Documento | Tipo | Responde a | Desde | Estado |
+|---|---|---|---|---|
+| `README.md` (raíz) | Resolver | ¿Cómo levanto y uso el sistema? | Parte 1 | existe |
+| `PLAN.md` y `PLAN-2.md` | Aprender | ¿Qué construyo en cada fase, y cómo lo verifico? | Partes 1 y 2 | existe |
+| `PROGRESO.md` | Consultar | ¿En qué voy, y qué dudas quedaron? | Parte 1 | existe |
+| `AGENTS.md` y `PROMPTS.md` | Consultar | ¿Cómo trabaja el agente, y qué le pido? | Parte 1 | existe |
+| `docs/GUIA.md` | Entender | ¿Cómo funciona todo, desde cero? | Parte 1 | existe |
+| `docs/COMO-ABORDAR.md` | Entender | ¿Cómo leo y estudio un proyecto de este tamaño? | Parte 2 | existe |
+| `docs/CRITERIO.md` | Entender | ¿Cómo decido rápido y bien? | Parte 2 | existe |
+| `docs/OT-TI.md` | Entender | ¿Qué hacer y qué no en un ambiente industrial? | Parte 2 | existe |
+| `docs/ATLAS-VISUAL.md` | Entender | ¿Cómo se ve cada idea del proyecto, en un dibujo? | Parte 2 | existe |
+| `docs/decisiones.md` | Entender | ¿Por qué se hizo así? | Parte 1 | existe |
+| `docs/RUNBOOK.md` | Resolver | ¿Qué hago cuando algo falla? | Parte 1 | existe |
+| `docs/topicos.md`, `docs/j1939.md` y `docs/rs485.md` | Consultar | ¿Cómo son los mensajes y los protocolos? | Parte 1 | existe |
+| `docs/rendimiento.md` | Consultar | ¿Cuánto tardan las consultas, antes y después? | Parte 1 | existe |
+| `docs/MAPA-DEL-CARGO.md` | Consultar | ¿Qué pide el cargo, dónde lo construye el proyecto y cuánto lo domino? | Parte 2 | existe |
+| `docs/apuntes/fase-NN.md` | Aprender | ¿Qué aprendí en cada fase? | Parte 1 | existe (fases 0 a 14) |
+| `docs/simulacros/` | Resolver | ¿Qué fallas practiqué, y cómo las encontré? | Fase 15 | pendiente · Fase 15 (ya existe el guion del agente) |
+| `docs/casos.md` | Consultar | ¿Qué decidí en cada `caso`, y qué aprendí? | Parte 2 | pendiente · primer `caso` |
+| `docs/catalogo.md` | Consultar | ¿Qué variables existen, con qué unidad y qué rangos? | Fase 17 | pendiente · Fase 17 |
+| `docs/calidad.md` | Entender | ¿Qué se marca, qué se aparta y quién lo revisa? | Fase 19 | pendiente · Fase 19 |
+| `docs/api/` | Consultar | ¿Qué entrega la API, y cómo cambia sin romper? | Fase 22 | pendiente · Fase 22 |
+| `docs/operacion/` | Resolver | Objetivos, continuidad, capacidad, calendario y responsables | Fases 23 a 30 | pendiente · Fases 23 a 30 |
+| `docs/plantillas/` | Resolver | Plantillas de cambio y de postmortem | Fase 25 | pendiente · Fase 25 |
+| `docs/seguridad/` | Entender | Zonas, amenazas y endurecimiento | Fase 27 | pendiente · Fase 27 |
+| `docs/procedimientos/` y `docs/actas/` | Resolver | ¿Cómo doy de alta o de baja un sitio, y qué se probó? | Fase 29 | pendiente · Fase 29 |
+| `docs/lista-de-produccion.md` | Consultar | ¿Está listo para producción, con qué evidencia? | Fase 30 | pendiente · Fase 30 |
 
 ## Reglas de la documentación
 
@@ -82,8 +87,8 @@ La documentación se separa según para qué se usa: es el marco Diátaxis. Mezc
 | Terminas un `caso` | Una línea en `docs/casos.md` |
 | Pones en servicio un sitio | Su acta en `docs/actas/` |
 | Aparece un término nuevo | El glosario de `docs/OT-TI.md` |
-| Cambia la arquitectura | Los diagramas de `docs/GUIA.md` y de `docs/COMO-ABORDAR.md` |
-| Cierras una fase | Su apunte, `PROGRESO.md` y este índice si nació un documento |
+| Cambia la arquitectura | Los diagramas de `docs/GUIA.md` y de `docs/COMO-ABORDAR.md`, y la tabla de la sección 1 de `docs/ATLAS-VISUAL.md` si nace un diagrama |
+| Cierras una fase | Su apunte, `PROGRESO.md` y este índice si nació un documento. En la Parte 2, también su entrada en `docs/ATLAS-VISUAL.md` |
 
 ## Formato de una decisión
 

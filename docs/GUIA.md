@@ -277,9 +277,22 @@ Proyecto_backend/
 ├── mosquitto/                mosquitto.conf y acl (passwd se genera y no se sube)
 ├── flows/                    flujo de Node-RED y su nodo function
 ├── deploy/                   systemd, nginx, respaldo y despliegue en Linux
-├── docs/                     esta guía, apuntes por fase, decisiones, runbook, rendimiento
+├── docs/
+│   ├── README.md             índice de toda la documentación: qué leer según lo que necesitas
+│   ├── GUIA.md               esta guía
+│   ├── COMO-ABORDAR.md       cómo leer y estudiar el proyecto: niveles de zoom y cinco mapas
+│   ├── CRITERIO.md           cómo decidir rápido: principios, tablas y casos
+│   ├── OT-TI.md              qué hacer y qué no en OT/TI, el grupo electrógeno y el glosario
+│   ├── decisiones.md         por qué se hizo así cada cosa importante
+│   ├── RUNBOOK.md            qué hacer cuando algo falla
+│   ├── rendimiento.md        cuánto tardan las consultas, antes y después de optimizar
+│   ├── topicos.md · j1939.md · rs485.md   referencia de MQTT y de los protocolos de terreno
+│   ├── apuntes/              un apunte por fase (fase-00 a fase-14)
+│   └── simulacros/           guion del agente para los simulacros (trae las respuestas: no lo abras)
 ├── Dockerfile · docker-compose.yml · package.json · .env.example
-└── README.md · PLAN.md · PROGRESO.md · AGENTS.md
+├── README.md · PROGRESO.md   cómo levantar el sistema, y en qué vas
+├── PLAN.md · PLAN-2.md       el plan: Parte 1 (fases 0 a 14) y Parte 2 (fases 15 a 30)
+└── AGENTS.md · CLAUDE.md · PROMPTS.md   reglas del agente (CLAUDE.md las importa) y los prompts
 ```
 
 **Cómo leer este mapa.** Cada línea es una carpeta (termina en `/`) o un archivo; las rayas `├──` y
@@ -338,14 +351,13 @@ Pero un cálculo largo sin pausas (un bucle de millones de vueltas) sí lo bloqu
 | `"scripts"` | `"api": "node --env-file=.env src/api/server.js"` | Atajos: `npm run api` |
 | `"dependencies"` | `express`, `mysql2`, `zod`, `mqtt`, `ws`... | Lo que necesita en producción |
 | `"devDependencies"` | `supertest` | Solo para las pruebas |
-| `"engines"` | `"node": ">=22.13"` | Versión mínima de Node |
+| `"engines"` | `"node": ">=26"` | Versión mínima de Node |
 
 | Opción de `node` | Qué hace |
 |---|---|
 | `--env-file=.env` | Carga las variables de `.env` en `process.env`, sin librerías |
 | `--watch` | Reinicia el proceso al guardar un archivo |
 | `--test` | Corre las pruebas de `node:test` |
-| `--disable-warning=ExperimentalWarning` | Calla el aviso de `node:sqlite` en Node 24.4 y anteriores |
 
 **Sintaxis mínima de JavaScript** (todo esto aparece en el proyecto):
 

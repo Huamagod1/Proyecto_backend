@@ -27,7 +27,7 @@ Lo acompañan cuatro documentos:
 
 El ciclo de cada paso sigue igual (ver `AGENTS.md`): leer, ejecutar la verificación, preguntar, responder la pregunta de entrevista y cerrar con el apunte.
 
-**Tu caso.** Windows 11 con Git Bash, Docker Desktop y Node 26; repositorio público `Huamagod1/Proyecto_backend`. Como es público, las llaves, los certificados y los respaldos nunca se suben: van en `datos/`, que Git ya ignora, o en `tls/`, que entra a `.gitignore` en la Fase 27.
+**Tu caso.** Windows 11 con Git Bash, Docker Desktop y Node 26 LTS, el mínimo que pide `package.json`; repositorio público `Huamagod1/Proyecto_backend`. Como es público, las llaves, los certificados y los respaldos nunca se suben: van en `datos/`, que Git ya ignora, o en `tls/`, que entra a `.gitignore` en la Fase 27.
 
 ## Punto de partida: lo que el repositorio ya tiene y lo que le falta
 
@@ -42,7 +42,7 @@ Esta tabla sale de leer tu código, no de una lista genérica.
 | Calidad | `calidad` vale 0 o 1 según un solo rango; `0x7FFF` se descarta con un log; los rechazos son contadores en memoria | Banderas de calidad, registro de sensores en falla y cuarentena con reproceso | 19 |
 | Agregados | `lecturas_hora` promedia también las lecturas fuera de rango | Reglas en lote, contadores, coherencia e indicadores por equipo | 20 |
 | Alarmas | Una palabra de 16 bits guardada como número; el cambio queda en el log del gateway | Alarmas como eventos con ciclo de vida, arranques y mantenimiento por horas | 21 |
-| Front | Rutas sin contrato ni versión; la serie entrega puntos crudos (hasta unos 60.000 en 7 días); token de 15 minutos sin renovación; el token del WebSocket viaja en la URL | Contrato OpenAPI, `/api/v1`, series con resolución, renovación de sesión y ticket | 22 |
+| Front | Rutas sin contrato ni versión; la serie entrega puntos crudos (hasta unos 121.000 por variable en 7 días, a una lectura cada 5 s); token de 15 minutos sin renovación; el token del WebSocket viaja en la URL | Contrato OpenAPI, `/api/v1`, series con resolución, renovación de sesión y ticket | 22 |
 | Vigilancia | `/api/metricas` es una foto en JSON, sin historia ni alertas; el detector de silencio vive dentro de la API: si la API cae, nadie avisa | Métricas con historia, alertas con procedimiento, vigilante externo y sonda de punta a punta | 23 |
 | Respaldos | Volcado diario probado; entre dos respaldos se puede perder hasta un día | Binlog y recuperación a un punto en el tiempo | 24 |
 | Cambios | Sin PR ni CI; el despliegue en Ubuntu (Fase 13) está pendiente | Entornos, CI, plantillas de cambio y de postmortem | 25 |
@@ -221,7 +221,7 @@ Proyecto_backend/
 - **Compatibilidad hacia atrás:** el esquema nuevo sigue funcionando con la versión anterior del código. Es lo que permite volver atrás un despliegue.
 - **DDL en línea:** `ALTER TABLE` que no bloquea la tabla (`ALGORITHM=INSTANT` o `INPLACE`). En MySQL, además, cada DDL hace commit por su cuenta: una migración fallida puede quedar a medias.
 
-**Construyes:** la carpeta `migraciones/`, `src/scripts/migrar.js`, `src/scripts/mantener-particiones.js`, `test/migraciones.test.js` y cambios en `preparar-db-test.sh`, `deploy/desplegar.sh` y el README.
+**Construyes:** la carpeta `migraciones/`, `src/scripts/migrar.js`, `src/scripts/mantener-particiones.js`, `src/tareas/programador.js` con su servicio `tareas` en `docker-compose.yml`, `test/migraciones.test.js`, `test/programador.test.js` y cambios en `preparar-db-test.sh`, `deploy/desplegar.sh` y el README.
 
 **Pasos**
 
@@ -236,7 +236,7 @@ Proyecto_backend/
 
    Un `.sql` puede traer varias sentencias; un `.js` exporta `subir(conexion)` para los cambios que necesitan lógica.
 3. **Sin "bajar".** No hay migraciones de vuelta atrás: deshacer un `DROP COLUMN` no devuelve los datos. Un error se corrige con otra migración hacia adelante o restaurando el respaldo. Escribe la regla en `docs/decisiones.md`.
-4. **`0006_particiones.js`: termina con la deriva.**
+4. **`0006_particiones.js`: termina con la deriva.** El particionado que tiene hoy tu base salió de `practica/rendimiento.sql` (Fase 11): el `ALTER TABLE lecturas PARTITION BY RANGE COLUMNS (ts)` creó los meses y `p_futuro`, y el `REORGANIZE PARTITION` comentado muestra cómo abrir el mes siguiente. La migración convierte ese trabajo a mano en un paso repetible y registrado:
    - Consulta `information_schema.PARTITIONS`.
    - Si `lecturas` no está particionada, la particiona por mes, desde el mes del dato más antiguo hasta dos meses adelante, más `p_futuro`.
    - Si ya lo está, solo se asegura de que existan los dos meses siguientes.
@@ -245,28 +245,37 @@ Proyecto_backend/
    - avisa si `p_futuro` tiene filas: señal de que corrió tarde;
    - termina con código distinto de 0 si falla.
 
-   Se programa una vez al mes. La alternativa (un `EVENT` con un procedimiento) funciona, pero falla en silencio; el script deja log y código de salida, y en la Fase 23 tendrá su alerta.
-6. **Paridad de permisos.** `preparar-db-test.sh` debe dar a `telemetria_app` los mismos permisos por tabla que producción, no `telemetria_test.*`. Cada migración que crea una tabla trae su `GRANT`. Así, una migración sin su permiso hace fallar una prueba y no la producción.
-7. **Expandir y contraer con un caso real.** `variables.minimo` y `maximo` pasan a llamarse `min_operacion` y `max_operacion`, porque la Fase 19 agrega el rango físico:
+   Se registra en el servicio `tareas` (paso 6) para correr una vez al mes. La alternativa (un `EVENT` con un procedimiento) funciona, pero falla en silencio; el script deja log y código de salida, y en la Fase 23 tendrá su alerta.
+6. **Servicio `tareas`** (`src/tareas/programador.js`): corre las tareas periódicas del sistema. Es un servicio más de Compose, con la misma imagen que la API y el gateway, en el perfil `completo`.
+   - Cada tarea se registra con su nombre, cuándo corre (cada N minutos, o un día y una hora UTC) y qué ejecuta.
+   - No superpone ejecuciones: si la corrida anterior de una tarea sigue en curso, la nueva no parte y queda anotada en el log.
+   - Cada corrida deja una línea de log JSON con `src/comun/log.js`: la tarea, el inicio, la duración y el resultado, con el error si falló. Una tarea que falla no detiene a las demás.
+   - La primera tarea es `mantener-particiones.js`. Las fases 20, 23 y 24 registran aquí las suyas.
+
+   POR QUÉ: en Windows no hay cron, y el laboratorio corre en Docker Desktop. Un servicio de Compose corre igual en Windows y en Linux, vive en Git junto al código y deja su log junto al de la API. En el Ubuntu de la Fase 13, el mismo programa puede correr como una unidad de systemd más, igual que la API y el gateway.
+7. **Paridad de permisos.** `preparar-db-test.sh` debe dar a `telemetria_app` los mismos permisos por tabla que producción, no `telemetria_test.*`. Cada migración que crea una tabla trae su `GRANT`. Así, una migración sin su permiso hace fallar una prueba y no la producción.
+8. **Expandir y contraer con un caso real.** `variables.minimo` y `maximo` pasan a llamarse `min_operacion` y `max_operacion`, porque la Fase 19 agrega el rango físico:
    - `0007_rango_operacion_expandir.sql` agrega las columnas nuevas con `ALGORITHM=INSTANT` y copia los valores;
-   - el código (`catalogo.js` y `validacion.js`) pasa a leer las nuevas;
+   - el código (`catalogo.js`, `validacion.js` y `generar-volumen.js`) pasa a leer las nuevas;
    - las viejas se eliminan en otra migración, recién al cerrar la Fase 19.
 
    Entre un paso y el otro, las dos versiones del código funcionan.
-8. **Integración:**
+9. **Integración:**
    - `preparar-db-test.sh` corre las migraciones sobre `telemetria_test`;
    - `desplegar.sh` respalda, migra y recién después cambia el enlace `actual`;
    - regla del despliegue: el esquema de la versión N debe servirle al código N−1.
-9. **Pruebas:**
-   - una base en línea base queda al día, y una segunda corrida no aplica nada;
-   - un archivo aplicado y luego editado detiene todo;
-   - una migración que falla no queda registrada;
-   - dos ejecuciones simultáneas no se pisan.
+10. **Pruebas:**
+    - una base en línea base queda al día, y una segunda corrida no aplica nada;
+    - un archivo aplicado y luego editado detiene todo;
+    - una migración que falla no queda registrada;
+    - dos ejecuciones simultáneas no se pisan;
+    - en `tareas`, una tarea que sigue en curso no se lanza otra vez, y una que falla no detiene a las demás.
 
 **Verifica**
 - `npm run migrar -- --estado` muestra lo mismo en tu base `telemetria` y en `telemetria_test`, que `preparar-db-test.sh` crea desde cero con la línea base y las migraciones.
 - `SHOW CREATE TABLE lecturas` es igual en las dos, particiones incluidas.
 - `npm test` pasa con los permisos por tabla.
+- `docker compose logs tareas` muestra una línea JSON por corrida, con su duración y su resultado.
 
 **Hacer y no hacer**
 
@@ -576,7 +585,10 @@ Proyecto_backend/
    - `POST /api/calidad/cuarentena/reprocesar` vuelve a pasar los mensajes por la misma validación, con su hora de llegada original. Como la escritura es idempotente, reprocesar dos veces no duplica.
 7. **Un mensaje, muchas variables.** Una variable mala no descarta el mensaje completo: se rechaza o se marca solo esa.
 8. **`docs/calidad.md`: la política.** Qué se marca, qué se rechaza, quién revisa la cuarentena, cada cuánto y cómo se reprocesa.
-9. **Contraer.** Ya nadie lee `minimo` ni `maximo`: una migración los elimina. Antes, busca esos nombres en todo el repositorio.
+9. **Contraer.** Ya nadie lee `variables.minimo` ni `variables.maximo`: una migración los elimina.
+   - El renombre es solo de la tabla `variables` y de su uso. OJO: `lecturas_hora` también tiene columnas `minimo` y `maximo`, el mínimo y el máximo de cada hora, y esas no cambian. Un buscar y reemplazar en todo el repositorio rompería los agregados.
+   - Los lugares reales son cinco. `sql/001_esquema.sql` y `sql/002_datos_iniciales.sql` crean y llenan las columnas: son la línea base y no se editan, porque la base cambia con las migraciones. `src/api/catalogo.js`, `src/comun/validacion.js` y `src/scripts/generar-volumen.js` leen los rangos. Además, se actualiza el diagrama de la sección 6 de `docs/GUIA.md`.
+   - `grep -rn -E "minimo|maximo" src sql test` muestra también `lecturas_hora` y variables locales con ese nombre (`src/comun/log.js` y `test/loteador.test.js`): esas no se tocan.
 
 **Verifica**
 - `sensor_cortado` en el simulador → una fila en `lecturas_sin_valor` con su motivo, y ninguna lectura inventada.
@@ -650,15 +662,18 @@ Proyecto_backend/
    - revisa una ventana: por defecto, las dos últimas horas; con `--desde` y `--hasta`, cualquier otra;
    - para cada equipo carga la serie ordenada, calcula las banderas, **borra** los bits 2, 3, 4 y 6 de la ventana y los vuelve a poner. Por eso es idempotente;
    - registra cada corrida en `calidad_ejecuciones`: ventana, versión de reglas, filas revisadas y filas marcadas;
-   - se programa cada 15 minutos. Los datos atrasados de un buffer se califican en la corrida siguiente.
+   - se registra en el servicio `tareas` (Fase 16) cada 15 minutos. Los datos atrasados de un buffer se califican en la corrida siguiente, si su `ts` cae dentro de la ventana.
+   - OJO: una ventana fija de dos horas no ve lo que quedó fuera de ella. En tu base hay dos horas a medias con todas sus lecturas a tiempo: el evento las calculó a las HH:05, la ingesta se cortó minutos después y ninguna corrida las completó (2026-11-16 15:00 al 75,5 %, 2026-11-20 19:00 al 19 %). Con un buffer que drena tarde pasa lo mismo. Decide en esta fase si la ventana parte donde terminó la última corrida de `calidad_ejecuciones` y suma las horas de las lecturas con `recibido_en` posterior.
 4. **Los contadores se restan, no se promedian.**
    - `lecturas_hora` gana `delta`, la suma de los incrementos de la hora: horas de marcha, kWh generados y litros consumidos.
    - Cada vuelta o reinicio queda en `contadores_eventos`, con el valor anterior y el nuevo.
 5. **Agregados que respetan la calidad.**
    - `lecturas_hora` gana `n_buenas`.
    - El promedio, el mínimo y el máximo se calculan sin las lecturas malas, y quedan en `NULL` si no hay ninguna buena.
-   - Hay que actualizar el evento de la Fase 11.
    - Después de cada corrida, el lote recalcula las horas que tocó. Si no, los agregados y las banderas se contradicen.
+   - **`ev_lecturas_hora` pasa al servicio `tareas`.** El evento de la Fase 11 recalcula cada hora las dos últimas horas; el lote ya lo hace cada 15 minutos, y después de calificar. La migración `calidad_lote` borra el evento (`DROP EVENT IF EXISTS ev_lecturas_hora`), y `lecturas_hora` queda con un solo escritor. Al cerrar la fase, la decisión 5 de `docs/decisiones.md` se marca como reemplazada.
+     - POR QUÉ: como con las particiones (Fase 16), un `EVENT` que falla solo deja una línea en el log de errores de MySQL; la tarea deja log, código de salida y su fila en `calidad_ejecuciones`.
+     - ALTERNATIVA: una tarea aparte cada hora, copia del evento. Se descarta: repite el trabajo del lote y escribe las mismas filas, y un agregado calculado antes de las banderas podría guardarse después y contradecirlas.
 6. **Indicadores por equipo y día,** en `calidad_diaria`:
    - completitud: mensajes recibidos sobre los esperados según el latido;
    - validez: porcentaje de lecturas que no son malas;
@@ -682,6 +697,7 @@ Proyecto_backend/
 - Coherencia: 380 V, 570 A y factor 0,8 dan 300,1 kW. Si la corriente llega con factor 0,1 (57 A), el cálculo da 30 kW contra 300 medidos: incoherente.
 - El promedio de una hora con un pico cambia al excluirlo. En una prueba con 329 lecturas, un solo pico de 140 °C movió el promedio de 85,29 a 85,46 °C.
 - La corrección de MTR-12 se aplica y se revierte, y el crudo nunca cambia.
+- `SHOW EVENTS` ya no lista `ev_lecturas_hora`, y una lectura nueva entra al agregado de su hora, con su `n_buenas`, en la corrida siguiente del lote.
 
 **Hacer y no hacer**
 
@@ -817,6 +833,9 @@ Proyecto_backend/
 
 1. **Versión.** Todo queda bajo `/api/v1`. Las rutas actuales siguen respondiendo en `/api`, marcadas como obsoletas, para no romper el dashboard ni las pruebas.
 2. **Una sola fuente.** Cada respuesta tiene su esquema zod, y `z.toJSONSchema()` lo convierte al formato de OpenAPI 3.1. `npm run contrato` escribe `docs/api/openapi.json`, y `GET /api/v1/openapi.json` lo sirve.
+   - Las fechas de las respuestas se declaran con `z.iso.datetime()`, no con `z.date()`: por el cable viajan como texto ISO 8601 con `Z` (paso 5), y `z.date()` no tiene equivalente en JSON Schema. Las pruebas de contrato validan el cuerpo ya convertido a JSON.
+   - El contrato se genera con `z.toJSONSchema(esquema, { unrepresentable: 'any' })`: lo que no se puede representar queda como "cualquier valor", en vez de detener la generación. OJO: un `z.date()` olvidado saldría así, sin decir que es una fecha; revisa el JSON generado.
+   - Los parámetros de consulta se describen con `io: 'input'`, es decir, como los manda el cliente: un parámetro con `.default()` es opcional para quien llama, aunque después de validar siempre exista.
 3. **Lo que necesita un front de monitoreo:**
 
    | Ruta bajo `/api/v1` | Entrega |
@@ -840,6 +859,8 @@ Proyecto_backend/
    - Referencias: 7 días a `15m` son 672 puntos; 30 días a `1h`, 720.
 5. **Horas.** La API entrega siempre UTC en ISO 8601 con `Z`; el front convierte a la zona del sitio. El "día" de `1d` y de los informes es el día local del sitio. Chile tiene más de una zona, y los días de cambio de hora duran 23 o 25 horas.
 6. **Errores con un solo formato** (`application/problem+json`, RFC 9457): `type`, `title`, `status`, `detail` y, en una validación, los errores por campo. El front escribe un solo manejador de errores.
+   - Cada error por campo lleva el `code` de zod (`too_small`, `invalid_type`) además del mensaje en español, que sale de `z.config(z.locales.es())` en `src/comun/zod.js`. POR QUÉ: el front decide con el `code`, que no cambia aunque cambie la redacción o el idioma; el mensaje es para mostrárselo a una persona.
+   - OJO: `z.flattenError`, el que usa hoy `src/comun/validacion.js`, guarda solo los mensajes. Para conservar el `code`, se le pasa una función como segundo argumento: `z.flattenError(error, (i) => ({ code: i.code, mensaje: i.message }))`.
 7. **Sesión para una aplicación web:**
    - `POST /auth/renovar`: un token de renovación rotatorio, en una cookie `HttpOnly`, `Secure` y `SameSite`. Su hash se guarda en `sesiones`. Si un token ya usado se presenta otra vez, se revoca toda la cadena;
    - `POST /ws-ticket`: un ticket de un solo uso y 30 segundos para abrir el WebSocket. Es la mejora que dejaste anotada en `docs/decisiones.md`;
@@ -858,8 +879,9 @@ Proyecto_backend/
 
 **Verifica**
 - El JSON del contrato se abre sin errores en un visor de OpenAPI.
-- La serie de 7 días de una variable devuelve 672 puntos a `15m`, con mínimo y máximo, y no decenas de miles de puntos crudos.
+- La serie de 7 días de una variable devuelve 672 puntos a `15m`, con mínimo y máximo, y no unos 121.000 puntos crudos.
 - Una respuesta de error tiene el mismo formato para un 401, un 404 y un 422.
+- Un 422 trae, en cada error por campo, el `code` de zod y el mensaje en español.
 - Con un token de renovación robado y reutilizado, la sesión completa queda revocada.
 - Renombra un campo de una respuesta sin regenerar el contrato: `npm test` falla.
 
@@ -869,7 +891,7 @@ Proyecto_backend/
 |---|---|---|
 | Diseñar las respuestas para la pantalla | Devolver las tablas tal cual | Cada cambio de la base rompería al front |
 | Entregar la unidad, la calidad y la resolución con el dato | Dejar que el front adivine o calcule estados | Dos lugares con la misma regla terminan mostrando cosas distintas |
-| Reducir puntos en el servidor, con mínimo y máximo | Mandar 60.000 puntos a un gráfico de 1.000 píxeles | El navegador se arrastra y el gráfico no muestra más |
+| Reducir puntos en el servidor, con mínimo y máximo | Mandar 121.000 puntos a un gráfico de 1.000 píxeles | El navegador se arrastra y el gráfico no muestra más |
 | Agregar campos; versionar lo incompatible | Renombrar un campo "porque quedó mejor" | El front falla en producción y tú no te enteras |
 | Paginar todo lo que puede crecer | Devolver "todas las alarmas" | Funciona con 50 y se cae con 500.000 |
 | Entregar datos de demostración y el contrato desde el primer día | Hacer esperar al front hasta que haya equipos reales | Los dos trabajan en paralelo y los desacuerdos aparecen antes |
@@ -879,7 +901,7 @@ Proyecto_backend/
 - [ ] Explicas por qué la serie viaja con mínimo y máximo.
 - [ ] Explicas cómo se renueva la sesión y qué pasa si roban el token de renovación.
 
-**Pregunta de entrevista.** *"El front te pide un gráfico de tres meses de potencia. ¿Qué le entregas?"* Una serie reducida en el servidor: un punto por día con promedio, mínimo y máximo, la unidad, el porcentaje de datos buenos y la resolución usada. Los 780.000 puntos crudos no le sirven a un gráfico. Si quiere mirar un día, vuelve a pedir ese rango y recibe más detalle. Todo está en el contrato OpenAPI, con datos de demostración para que no dependa de mí.
+**Pregunta de entrevista.** *"El front te pide un gráfico de tres meses de potencia. ¿Qué le entregas?"* Una serie reducida en el servidor: un punto por día con promedio, mínimo y máximo, la unidad, el porcentaje de datos buenos y la resolución usada. Más de 1,5 millones de puntos crudos (uno cada 5 s) no le sirven a un gráfico. Si quiere mirar un día, vuelve a pedir ese rango y recibe más detalle. Todo está en el contrato OpenAPI, con datos de demostración para que no dependa de mí.
 
 **Simulacros que habilita:** "el front dice que la API cambió" y "el gráfico muestra datos en la hora equivocada".
 
@@ -891,7 +913,7 @@ Proyecto_backend/
 
 **Objetivo:** enterarte de un problema antes que el cliente, con evidencia para diagnosticarlo y un procedimiento para cada alerta.
 **Tu tiempo:** 3 horas.
-**Depende de:** nada (aprovecha lo de las fases 16, 18 y 20, si existen).
+**Depende de:** 16, por el servicio `tareas`; aprovecha lo de las fases 18 y 20, si existen.
 
 **La idea.** Hoy la plataforma vigila a los motores; falta vigilar a la plataforma. Es armarle su propia sala de control: instrumentos (métricas con historia), alarmas con prioridad, un procedimiento por alarma y alguien que vigile al vigilante.
 
@@ -918,17 +940,21 @@ Proyecto_backend/
    | Loteador | Filas pendientes, duración de cada escritura y filas descartadas |
    | Base | Conexiones del pool en uso, bytes por tabla y días de particiones abiertos por delante |
    | Terreno | Equipos en silencio, gateways en línea y, por gateway, mensajes en buffer y desfase de reloj |
-   | Operación | Edad de cada hito: el último respaldo, el último lote de calidad y la última restauración probada |
+   | Operación | Edad de cada hito: el último respaldo, el último lote de calidad, la hora más reciente de `lecturas_hora` y la última restauración probada |
 
    Los gateways publican su propia salud cada minuto en `motores/{sitio}/gateways/{id}/salud`.
 3. **Perfil `observabilidad` de Compose:** Prometheus, Alertmanager, Grafana (con la fuente de datos y un tablero guardados como archivos), el exportador de MySQL (con un usuario `telemetria_monitor` de solo lectura) y un receptor de alertas que las imprime. Fija la versión de cada imagen.
-4. **Sonda de punta a punta.** `sonda.js` publica cada minuto una lectura de un equipo de prueba (`MTR-SONDA`, en su propio sitio), por MQTT y con su propia credencial. Después consulta la API hasta verla. Mide si llegó y cuánto tardó. Es el indicador que más se parece a lo que vive un cliente.
+4. **Sonda de punta a punta.** `sonda.js` es una tarea del servicio `tareas` (Fase 16): cada minuto publica una lectura de un equipo de prueba, `MTR-9999`, en un sitio propio llamado `sonda`, por MQTT y con su propia credencial. Después consulta la API hasta verla. Mide si llegó y cuánto tardó. Es el indicador que más se parece a lo que vive un cliente.
+   - El código cumple la regla de siempre (`^MTR-\d{2,4}$`, en `rutas/motores.js`): la validación no se relaja por la sonda.
+   - `MTR-9999` queda reservado: nunca se asigna a un equipo real.
+   - El sitio `sonda` se excluye de los indicadores y de las alertas de la flota, como la completitud y `EquiposEnSilencio`. La sonda tiene su propia alerta, `SondaFallando`.
+   - OJO: si `tareas` se detiene, no hay sonda que falle. Por eso `SondaFallando` también se dispara cuando la sonda deja de informar.
 5. **Reglas de alerta,** cada una con su gravedad y un enlace a su procedimiento:
 
    | Alerta | Condición | Gravedad |
    |---|---|---|
    | `ApiCaida` | Prometheus no logra leer la API por 2 minutos | Urgente |
-   | `SondaFallando` | La sonda no ve su dato 3 veces seguidas | Urgente |
+   | `SondaFallando` | La sonda no ve su dato 3 veces seguidas, o no informa por 3 minutos | Urgente |
    | `IngestaDetenida` | Ninguna lectura aceptada en 10 minutos | Urgente |
    | `LoteadorAcumulando` | Las filas pendientes crecen durante 10 minutos | Urgente |
    | `RespaldoAntiguo` | El último respaldo tiene más de 26 horas | Urgente |
@@ -936,9 +962,11 @@ Proyecto_backend/
    | `RechazosAltos` | Más del 5 % de las lecturas rechazadas en 15 minutos | Aviso |
    | `EquiposEnSilencio` | Algún equipo en silencio por 10 minutos | Aviso |
    | `ParticionesPorAgotarse` | Quedan menos de 15 días de particiones abiertas | Aviso |
+   | `AgregadosAtrasados` | La hora más reciente de `lecturas_hora` tiene más de 2 horas. Por qué 2 horas: en marcha normal, esa edad llega a 1 h 15 min con el lote de la Fase 20 (cada 15 minutos) y a 1 h 5 min con el evento de la Fase 11 (a las HH:05), porque los dos recalculan también la hora en curso. Con el lote quedan 45 minutos de margen: dos corridas perdidas seguidas no la disparan | Aviso |
    | `Vigilante` | Siempre activa | — |
 
    Urgente significa que alguien se despierta. Aviso significa que se revisa en horario hábil.
+   - **Regla de inhibición en Alertmanager:** mientras `IngestaDetenida` está activa, no se notifican `EquiposEnSilencio` ni `AgregadosAtrasados`. Una causa, una alerta: si no entra ninguna lectura, todos los equipos callan y los agregados se atrasan, pero el problema es uno solo. El detalle se diseña en esta fase.
 6. **Objetivos,** en `docs/operacion/objetivos.md`:
    - frescura: el 99 % de las sondas ve su dato en la API en menos de 30 s;
    - disponibilidad de la API: 99,5 % al mes, es decir, un presupuesto de error de 3,6 horas;
@@ -982,7 +1010,7 @@ Proyecto_backend/
 
 **Objetivo:** poder volver la base al minuto anterior a un accidente, y haberlo probado.
 **Tu tiempo:** 2 horas.
-**Depende de:** nada.
+**Depende de:** 16, por el servicio `tareas`.
 
 **La idea.** El respaldo es el grupo de emergencia de tus datos. No se evalúa por tenerlo instalado, sino por si parte y toma carga el día del corte. Por eso se prueba con carga y con el reloj corriendo.
 
@@ -994,16 +1022,17 @@ Proyecto_backend/
 - **Recuperación a un punto en el tiempo:** restaurar el último respaldo y volver a aplicar el binlog hasta justo antes del accidente.
 - **Regla 3-2-1:** tres copias, en dos medios distintos, una fuera del sitio.
 
-**Construyes:** cambios en `deploy/respaldo.sh`, `deploy/respaldo-binlog.sh`, el servicio `mysql-restauracion` en Compose (perfil `restauracion`), `docs/operacion/continuidad.md` y la sección 4 de `RUNBOOK.md` ampliada.
+**Construyes:** cambios en `deploy/respaldo.sh`, `deploy/respaldo-binlog.sh` y su registro en `tareas`, el servicio `mysql-restauracion` en Compose (perfil `restauracion`), `docs/operacion/continuidad.md` y la sección 4 de `RUNBOOK.md` ampliada.
 
 **Pasos**
 
 1. **Fija los objetivos** en `continuidad.md`: por ejemplo, RPO de 15 minutos y RTO de una hora. Anota lo que tienes hoy: RPO de 24 horas y un RTO sin medir.
 2. **`respaldo.sh`:**
+   - deja el `crontab` de la Fase 13: se registra en el servicio `tareas`, una vez al día;
    - agrega `--source-data=2`, que anota dentro del respaldo el archivo y la posición del binlog en ese instante;
    - guarda un SHA-256 del archivo;
    - si ya hiciste la Fase 23, registra el hito `respaldo_ok` en `hitos_operacion`, para la alerta `RespaldoAntiguo`.
-3. **`respaldo-binlog.sh`,** cada 15 minutos: `FLUSH BINARY LOGS` cierra el binlog en curso, y los cerrados se copian a la carpeta de respaldos. Ese intervalo es tu RPO.
+3. **`respaldo-binlog.sh`,** registrado en `tareas` cada 15 minutos: `FLUSH BINARY LOGS` cierra el binlog en curso, y los cerrados se copian a la carpeta de respaldos. Ese intervalo es tu RPO.
 4. **Una instancia aparte para restaurar.** `mysql-restauracion` usa la misma imagen, otro volumen y otro puerto (`127.0.0.1:3308`), sin los scripts de `sql/`.
 5. **El simulacro.** El agente ejecuta un `UPDATE` sin `WHERE` sobre `variables` en un momento que no te dice, con la ingesta andando. Tú:
    1. lo detectas y acotas la hora;
@@ -1029,6 +1058,7 @@ Proyecto_backend/
 - `mysqlbinlog` muestra e interpreta las horas en la zona horaria de la máquina donde corre. Trabaja en UTC (`TZ=UTC`) o usa posiciones.
 - Comprueba que la imagen trae la herramienta: `docker compose exec mysql sh -c 'command -v mysqlbinlog'`. Si no la trae, úsala desde un contenedor auxiliar.
 - En MySQL 8.4, el estado del binlog se consulta con `SHOW BINARY LOG STATUS`. `--single-transaction` da una foto coherente solo de las tablas InnoDB.
+- Hoy `respaldo.sh` llama a `docker exec` desde el equipo, y dentro de `tareas` no hay Docker. Montarle el socket de Docker le daría control total del equipo. La tarea se conecta a MySQL por la red, con `mysqldump` y `mysqlbinlog` de MySQL 8.4: el paquete de Debian trae los de MariaDB.
 
 **Hacer y no hacer**
 
@@ -1037,7 +1067,7 @@ Proyecto_backend/
 | Restaurar primero en una instancia aparte y validar | Restaurar encima de producción | Si el respaldo está malo, perdiste también lo que tenías |
 | Probar la restauración completa y medir el tiempo | Dar por bueno un respaldo porque el archivo existe | Un respaldo que nunca se restauró es una suposición |
 | Copiar el binlog cada pocos minutos | Depender solo del volcado nocturno | Un accidente a las 18:00 costaría el día entero |
-| Vigilar la edad del último respaldo con una alerta | Enterarte de que el cron falló el día que lo necesitas | Los respaldos fallan en silencio |
+| Vigilar la edad del último respaldo con una alerta | Enterarte de que la tarea falló el día que lo necesitas | Los respaldos fallan en silencio |
 | Proteger los respaldos igual que la base | Dejarlos en una carpeta compartida | Quien se lleva el respaldo se lleva todo |
 
 **La dominas si…**
@@ -1266,8 +1296,28 @@ Proyecto_backend/
    - `crear-ca.sh` crea la autoridad en `tls/`.
    - `emitir-certificado.sh <nombre>` firma un certificado: uno para el broker, con los nombres `mosquitto` y `localhost`, y uno por cada cliente del broker (la API, cada gateway, Node-RED y la sonda), con su nombre de usuario como CN.
    - OJO en Git Bash: `-subj "/CN=..."` se convierte en una ruta de Windows. Usa `MSYS_NO_PATHCONV=1` o `//CN=...`.
-5. **Broker con TLS mutuo:** `listener 8883` con `cafile`, `certfile`, `keyfile`, `require_certificate true` y `use_identity_as_username true`. La identidad del cliente pasa a ser el CN de su certificado, y la ACL se aplica a ese nombre. El 1883 sin cifrar se cierra, y con él deja de usarse el archivo de claves.
-   - OJO: si el broker sigue pidiendo clave en el 8883, revisa en la documentación de tu versión cómo se combina `use_identity_as_username` con el plugin de claves.
+5. **Broker con TLS mutuo:** `listener 8883` con `cafile`, `certfile`, `keyfile`, `require_certificate true` y `use_identity_as_username true`. La identidad del cliente pasa a ser el CN de su certificado, y la ACL se aplica a ese nombre. El 1883 sin cifrar se cierra, y con él se quitan de `mosquitto.conf` las dos líneas del plugin de claves: `plugin /usr/lib/mosquitto_password_file.so` y `plugin_opt_password_file`. El archivo `passwd` deja de usarse.
+   - OJO: si esas dos líneas quedan, el plugin puede seguir pidiendo clave en el 8883 aunque el certificado sea válido.
+   - **La ACL deja el comodín de sitio** y pasa a permisos por tipo de tópico. Con `motores/norte/#`, un gateway robado puede publicar alertas falsas en `motores/norte/alertas` y, desde la Fase 28, comandos. Cada gateway escribe solo la telemetría, el estado y la comunicación de su sitio (y su salud, desde la Fase 23), y desde la Fase 28 solo lee sus comandos. La API es la única que escribe comandos y alertas. Para el sitio norte:
+     ```
+     user gw-norte
+     topic write motores/norte/+/telemetria
+     topic write motores/norte/+/comunicacion
+     topic write motores/norte/gateways/gw-norte/estado
+     # desde la Fase 23
+     topic write motores/norte/gateways/gw-norte/salud
+     # desde la Fase 28
+     topic read motores/norte/+/comandos
+
+     user api
+     topic read motores/#
+     topic write motores/+/alertas
+     # desde la Fase 28
+     topic write motores/+/+/comandos
+
+     user sonda
+     topic write motores/sonda/MTR-9999/telemetria
+     ```
 6. **Clientes.** El gateway y la API se conectan con `mqtts://` y validan al broker con la CA (`rejectUnauthorized: true`). Nunca se desactiva la validación "para probar".
 7. **Tres simulacros de identidad:**
    - renueva el certificado de `gw-norte` sin perder datos: el buffer cubre el reinicio;
@@ -1292,6 +1342,7 @@ Proyecto_backend/
 **Verifica**
 - Desde el contenedor de la API, una conexión al simulador falla: no hay ruta.
 - Con el certificado de `gw-norte` se publica en `motores/norte/...`. En `motores/sur/...`, el broker responde "no autorizado" (código 135).
+- Con ese mismo certificado tampoco se publica en `motores/norte/alertas`: eso solo lo escribe la API.
 - Sin certificado, la conexión se rechaza en el saludo TLS.
 - Después de anular a `gw-sur`, su gateway no logra publicar y sus mensajes quedan en el buffer.
 - `docker compose ps` no muestra `0.0.0.0:3306` ni `0.0.0.0:1883`.
@@ -1417,6 +1468,8 @@ Proyecto_backend/
    - los equipos, con su perfil y sus datos de placa;
    - el certificado del gateway;
    - la sección del gateway en la ACL.
+
+   OJO: antes de dar de alta sitios reales, el formato del código de equipo (`MTR-` y de 2 a 4 dígitos) se revisa contra la nomenclatura de la empresa. Ese código viaja en los tópicos, la ACL, las URL de la API y las integraciones: cambiarlo después obliga a tocar todo eso. `MTR-9999` y el sitio `sonda` están reservados para la sonda (Fase 23).
 2. **El procedimiento,** en cinco etapas:
    1. **Antes de viajar:** el modelo y el firmware de cada controlador, su manual de comunicaciones, el perfil probado contra el simulador, la red del sitio (el gateway solo necesita salida) y la ventana acordada con quien opera.
    2. **Conexión:** el gateway lee sin error, su reloj está sincronizado y su credencial funciona.

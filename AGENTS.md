@@ -112,6 +112,7 @@ services:
    - **Dos ejercicios a mano**, tomados de la sección "Ejercicios a mano" del plan.
 2. Actualiza `PROGRESO.md` (fecha, fase, qué se hizo y dudas abiertas) y marca las casillas del plan.
 3. Actualiza la documentación que la fase cambió, según la tabla "Qué se actualiza cuándo" de `docs/README.md`, y agrega al índice los documentos nuevos.
+   - En la Parte 2, agrega la entrada de la fase a `docs/ATLAS-VISUAL.md`, con el diagrama de su apunte (la regla está en **Documentación**).
 4. Agrega al glosario de `docs/OT-TI.md` los términos nuevos que falten, en una línea cada uno.
 5. Propón el mensaje de commit (Conventional Commits, en español) y el tag. El flujo de Git lo hago yo.
 
@@ -130,6 +131,7 @@ services:
 - Cada documento es de un solo tipo: aprender, resolver, consultar o entender. No mezcles un tutorial con una referencia.
 - Si cambias algo que un documento describe, actualízalo en el mismo cambio. Si encuentras un documento que contradice al código, avísame y propón la corrección.
 - Los diagramas van en Mermaid, con su explicación debajo. Comprueba que se dibujan; si no pudiste comprobarlo, dilo.
+- Cada fase de la Parte 2 deja al menos un diagrama Mermaid en su apunte y una entrada en `docs/ATLAS-VISUAL.md` con **Cómo leerlo**, **La idea** y **Profundiza en** (sección 13 del atlas).
 - Escribe para alguien que no conoce el proyecto: frases cortas, ejemplos de este repositorio y comandos que funcionan.
 
 ## Casos de criterio
@@ -156,6 +158,19 @@ Cuando escribo `simulacro`:
 7. Cuando escriba `resuelto: <causa>`, evalúa la causa, la evidencia y qué pasó con los datos. Si falta algo, pregúntamelo.
 8. Revierte, comprueba de nuevo el estado sano y prepara la ficha como dice el guion. Yo escribo el diagnóstico.
 
+## Sesiones de estudio
+Cuando escribo `estudia <área>`, con un área de `docs/MAPA-DEL-CARGO.md`, das una sesión guiada de 20 a 30 minutos:
+1. La idea en 3 líneas, con una analogía de mi experiencia (PLC, SCADA, PI) o de mis proyectos.
+2. Su diagrama del atlas. Si no hay, lo dibujas en Mermaid y lo agregas al atlas, con el formato de su sección 13, y a la columna Diagramas del mapa.
+3. Verla funcionando: un comando o una pantalla del laboratorio, y qué mirar en la salida.
+4. El código que lo hace, de lo general a lo particular.
+5. Tres preguntas, una a la vez, esperando y evaluando cada respuesta.
+6. Un ejercicio de 10 minutos, sin la solución hasta que la pida.
+
+Al terminar, propones el nivel según mis respuestas. Cuando lo confirmo, actualizas el nivel y la última sesión en el mapa.
+
+Con `estudia` solo, propones el área de nivel más bajo entre las que ya están construidas, es decir, las que el mapa no marca "Desde la Fase N". Un nivel vacío cuenta como el más bajo; si hay empate, va la primera del mapa.
+
 ## Palabras clave
 | Escribo | Haces |
 |---|---|
@@ -166,6 +181,7 @@ Cuando escribo `simulacro`:
 | `define <término>` | Tres niveles: una línea; la explicación con una analogía industrial; y el detalle técnico, con dónde aparece en este repositorio y el error típico. Si falta en el glosario de `docs/OT-TI.md`, lo agregas |
 | `pregúntame` | 3 preguntas de entrevista sobre lo último, una a la vez, evaluando cada respuesta: qué faltó y cómo decirlo en 30 segundos |
 | `ejercicio` | Un ejercicio a mano de 10 a 20 minutos sobre lo último, sin la solución hasta que la pida |
+| `estudia <área>` o `estudia` | Una sesión guiada de 20 a 30 minutos sobre un área de `docs/MAPA-DEL-CARGO.md`, con el protocolo de la sección "Sesiones de estudio" |
 | `cierra la fase` | Los cinco puntos de "Al cerrar cada fase" |
 | `caso` o `caso <tema>` | Una situación real para decidir en 2 minutos, con el protocolo de la sección "Casos de criterio" |
 | `simulacro` | Una falla de laboratorio para diagnosticar, con el protocolo de la sección "Simulacros" |

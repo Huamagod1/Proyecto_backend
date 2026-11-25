@@ -185,6 +185,13 @@ Son unas 5 horas, en 3 o 4 sesiones. El paso 5 es el corazón del sistema: si so
 
 1. **Sigue un dato de punta a punta.** Toma una lectura real y búscala en cada etapa:
    ```bash
+   # 0. Prepara la terminal. SEGURIDAD: las claves y el token quedan en ella; no los imprimas.
+   set -a; source .env; set +a      # set -a exporta cada variable que se define; set +a lo apaga
+   #    Un token de ing-norte (dura 15 min). node saca el campo token del JSON: no hace falta jq.
+   #    Si $TOKEN queda en "undefined", el login falló.
+   TOKEN=$(curl -s -X POST localhost:3000/api/auth/login -H 'Content-Type: application/json' \
+     -d "{\"usuario\":\"ing-norte\",\"clave\":\"$CLAVE_ING_NORTE\"}" \
+     | node -pe 'JSON.parse(require("fs").readFileSync(0, "utf8")).token')
    # 1. En el broker: un mensaje de MTR-01 (copia su ts)
    docker compose exec mosquitto mosquitto_sub -u api -P "$MQTT_CLAVE" -t 'motores/norte/MTR-01/telemetria' -C 1 -v
    # 2. En la base: las filas de ese instante
