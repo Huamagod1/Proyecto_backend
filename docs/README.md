@@ -52,7 +52,8 @@ La columna **Estado** dice si el documento ya existe o en qué fase nace. Lo pen
 | `docs/rendimiento.md` | Consultar | ¿Cuánto tardan las consultas, antes y después? | Parte 1 | existe |
 | `docs/MAPA-DEL-CARGO.md` | Consultar | ¿Qué pide el cargo, dónde lo construye el proyecto y cuánto lo domino? | Parte 2 | existe |
 | `docs/apuntes/fase-NN.md` | Aprender | ¿Qué aprendí en cada fase? | Parte 1 | existe (fases 0 a 14) |
-| `docs/simulacros/` | Resolver | ¿Qué fallas practiqué, y cómo las encontré? | Fase 15 | pendiente · Fase 15 (ya existe el guion del agente) |
+| `docs/simulacros/linea-base.md` | Consultar | ¿Cómo se ve el sistema sano? | Fase 15 | existe |
+| `docs/simulacros/` | Resolver | ¿Qué fallas practiqué, y cómo las encontré? | Fase 15 | existe: README, línea base y guion del agente; las fichas, desde el primer simulacro |
 | `docs/casos.md` | Consultar | ¿Qué decidí en cada `caso`, y qué aprendí? | Parte 2 | pendiente · primer `caso` |
 | `docs/catalogo.md` | Consultar | ¿Qué variables existen, con qué unidad y qué rangos? | Fase 17 | pendiente · Fase 17 |
 | `docs/calidad.md` | Entender | ¿Qué se marca, qué se aparta y quién lo revisa? | Fase 19 | pendiente · Fase 19 |
